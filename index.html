@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaFlow - Hydration Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQXF1YUZsb3ciLCJzaG9ydF9uYW1lIjoiQXF1YUZsb3ciLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBkMGQyMyIsInRoZW1lX2NvbG9yIjoiIzAwZmZmZiJ9">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Navigation -->
+        <nav class="nav-bar">
+            <div class="nav-brand">
+                <span class="logo">💧</span>
+                <span class="brand-text">AquaFlow</span>
+            </div>
+            <div class="nav-links">
+                <button class="nav-btn" data-page="home">Home</button>
+                <button class="nav-btn" data-page="tracker">Tracker</button>
+                <button class="nav-btn" data-page="stats">Stats</button>
+                <button class="nav-btn" data-page="about">About</button>
+            </div>
+        </nav>
+
+        <!-- Home Page -->
+        <div id="home-page" class="page active">
+            <div class="hero-section">
+                <div class="floating-elements">
+                    <div class="floating-drop drop-1">💧</div>
+                    <div class="floating-drop drop-2">🌊</div>
+                    <div class="floating-drop drop-3">💎</div>
+                </div>
+                
+                <div class="hero-content">
+                    <h1 class="hero-title">
+                        <span class="gradient-text">AquaFlow</span>
+                        <div class="subtitle">Stay Hydrated, Stay Legendary</div>
+                    </h1>
+                    
+                    <div class="welcome-card glass-card" id="welcome-section">
+                        <div class="card-content">
+                            <div class="avatar-section">
+                                <div class="avatar">🧑‍💼</div>
+                            </div>
+                            <h2>Welcome to Your Hydration Journey</h2>
+                            <p>Enter your name to begin your aquatic adventure</p>
+                            <div class="input-group">
+                                <input type="text" id="userName" placeholder="Your name..." class="neon-input">
+                                <button id="startJourney" class="neon-btn primary">
+                                    <span>Start Journey</span>
+                                    <div class="btn-glow"></div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="welcome-back-card glass-card hidden" id="welcome-back-section">
+                        <div class="card-content">
+                            <h2>Welcome Back, <span id="userNameDisplay"></span>! 🌊</h2>
+                            <p class="status-text" id="hydrationStatus"></p>
+                            <button class="neon-btn primary" data-page="tracker">
+                                <span>Continue Hydrating</span>
+                                <div class="btn-glow"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tracker Page -->
+        <div id="tracker-page" class="page">
+            <div class="tracker-section">
+                <div class="hydration-header">
+                    <h1>Hydration Central</h1>
+                    <div class="daily-goal">
+                        <span id="currentGlasses">0</span> / <span id="dailyGoal">8</span> glasses
+                    </div>
+                </div>
+
+                <div class="progress-section">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                            <div class="progress-wave"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">0%</div>
+                    </div>
+                </div>
+
+                <div class="hydration-action">
+                    <div class="glass-container">
+                        <div class="water-glass" id="waterGlass">
+                            <div class="water-fill" id="waterFill"></div>
+                            <div class="glass-shine"></div>
+                        </div>
+                    </div>
+                    
+                    <button class="drink-btn" id="drinkBtn">
+                        <span>Drink Water</span>
+                        <div class="ripple"></div>
+                    </button>
+                </div>
+
+                <div class="fun-facts-section">
+                    <div class="fact-card glass-card">
+                        <h3>💡 Hydration Wisdom</h3>
+                        <p id="funFact" class="fact-text"></p>
+                    </div>
+                </div>
+
+                <div class="quick-stats">
+                    <div class="stat-item glass-card">
+                        <div class="stat-icon">🔥</div>
+                        <div class="stat-label">Current Streak</div>
+                        <div class="stat-value" id="currentStreak">0</div>
+                    </div>
+                    <div class="stat-item glass-card">
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-label">Level</div>
+                        <div class="stat-value" id="currentLevel">Thirsty Noob</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Page -->
+        <div id="stats-page" class="page">
+            <div class="stats-section">
+                <h1>Your Hydration Stats</h1>
+                
+                <div class="stats-grid">
+                    <div class="stat-card glass-card">
+                        <div class="stat-header">
+                            <div class="stat-icon-large">💧</div>
+                            <h3>Total Glasses</h3>
+                        </div>
+                        <div class="stat-number" id="totalGlassesCount">0</div>
+                    </div>
+
+                    <div class="stat-card glass-card">
+                        <div class="stat-header">
+                            <div class="stat-icon-large">🔥</div>
+                            <h3>Best Streak</h3>
+                        </div>
+                        <div class="stat-number" id="bestStreak">0</div>
+                        <div class="stat-unit">days</div>
+                    </div>
+
+                    <div class="stat-card glass-card">
+                        <div class="stat-header">
+                            <div class="stat-icon-large">🏆</div>
+                            <h3>Current Level</h3>
+                        </div>
+                        <div class="level-display">
+                            <div class="level-name" id="levelName">Thirsty Noob</div>
+                            <div class="level-progress">
+                                <div class="level-bar">
+                                    <div class="level-fill" id="levelFill"></div>
+                                </div>
+                                <div class="level-text" id="levelProgress">0/10</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card glass-card">
+                        <div class="stat-header">
+                            <div class="stat-icon-large">📅</div>
+                            <h3>Today's Progress</h3>
+                        </div>
+                        <div class="today-progress">
+                            <div class="circular-progress">
+                                <svg class="progress-circle" width="120" height="120">
+                                    <circle cx="60" cy="60" r="50" stroke="#333" stroke-width="8" fill="none"/>
+                                    <circle cx="60" cy="60" r="50" stroke="url(#gradient)" stroke-width="8" fill="none" 
+                                            stroke-dasharray="314" stroke-dashoffset="314" id="todayCircle"/>
+                                    <defs>
+                                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#00ffff"/>
+                                            <stop offset="100%" style="stop-color:#ff00ff"/>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                <div class="progress-number" id="todayPercent">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="achievements-section">
+                    <h2>Achievements</h2>
+                    <div class="achievements-grid" id="achievementsGrid">
+                        <!-- Achievements will be dynamically generated -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- About Page -->
+        <div id="about-page" class="page">
+            <div class="about-section">
+                <h1>About AquaFlow</h1>
+                
+                <div class="about-content">
+                    <div class="about-card glass-card">
+                        <h2>💧 Your Hydration Companion</h2>
+                        <p>AquaFlow is designed to make staying hydrated fun and engaging. Through gamification, beautiful design, and smart reminders, we help you build healthy hydration habits that last.</p>
+                    </div>
+
+                    <div class="about-card glass-card">
+                        <h2>🎮 Gamified Experience</h2>
+                        <p>Level up from "Thirsty Noob" to "Aqua God" as you maintain your hydration streaks. Earn achievements, track your progress, and compete with your past self.</p>
+                    </div>
+
+                    <div class="about-card glass-card">
+                        <h2>🔔 Smart Notifications</h2>
+                        <p>Receive personalized hydration reminders that adapt to your schedule and preferences. Stay on track without being overwhelmed.</p>
+                    </div>
+
+                    <div class="settings-section">
+                        <h2>Settings</h2>
+                        <div class="settings-card glass-card">
+                            <div class="setting-item">
+                                <label for="dailyGoalInput">Daily Goal (glasses):</label>
+                                <input type="number" id="dailyGoalInput" min="6" max="12" value="8" class="neon-input">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="notificationsToggle">Push Notifications:</label>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="notificationsToggle" class="toggle-input">
+                                    <label for="notificationsToggle" class="toggle-label"></label>
+                                </div>
+                            </div>
+
+                            <button id="resetDataBtn" class="neon-btn danger">
+                                <span>Reset All Data</span>
+                                <div class="btn-glow"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Popup -->
+        <div id="notification-popup" class="notification-popup hidden">
+            <div class="notification-content glass-card">
+                <div class="notification-icon">💧</div>
+                <div class="notification-text">
+                    <h3>Great job!</h3>
+                    <p id="notification-message"></p>
+                </div>
+                <button class="close-notification">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
