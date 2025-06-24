@@ -100,7 +100,9 @@ userData = {
 
 ## Changelog
 
-- June 24, 2025. Initial setup
+- June 24, 2025: Initial setup with gamified hydration tracker
+- June 24, 2025: Enhanced notification system with smart reminders, mobile support, and service worker
+- June 24, 2025: Improved daily reset logic with proper streak tracking and historical data storage
 
 ## User Preferences
 

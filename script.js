@@ -111,14 +111,62 @@ class HydrationTracker {
         const today = new Date().toDateString();
         const lastDate = data.lastDrinkDate;
         
-        if (lastDate !== today) {
-            // New day - reset daily progress
-            if (lastDate && data.glassesDrankToday < data.dailyGoal) {
-                // Didn't meet goal yesterday, reset streak
+        if (lastDate && lastDate !== today) {
+            // New day detected - check if we need to update streak
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayString = yesterday.toDateString();
+            
+            if (lastDate === yesterdayString) {
+                // Last drink was yesterday
+                if (data.glassesDrankToday >= data.dailyGoal) {
+                    // Met goal yesterday, maintain streak
+                    console.log('Goal met yesterday, maintaining streak');
+                } else {
+                    // Didn't meet goal yesterday, reset streak
+                    data.hydrationStreak = 0;
+                    console.log('Goal not met yesterday, streak reset');
+                }
+            } else {
+                // Gap in days, reset streak
                 data.hydrationStreak = 0;
+                console.log('Gap in days detected, streak reset');
             }
+            
+            // Always reset daily progress for new day
             data.glassesDrankToday = 0;
-            data.lastDrinkDate = today;
+            
+            // Store yesterday's data in history
+            this.storeHistoricalData(data, lastDate);
+        }
+        
+        // Update last drink date to today
+        data.lastDrinkDate = today;
+    }
+
+    storeHistoricalData(data, date) {
+        try {
+            const historyKey = 'hydrationHistory';
+            let history = JSON.parse(localStorage.getItem(historyKey)) || {};
+            
+            // Store the day's data
+            history[date] = {
+                glasses: data.glassesDrankToday,
+                goal: data.dailyGoal,
+                goalMet: data.glassesDrankToday >= data.dailyGoal,
+                streak: data.hydrationStreak
+            };
+            
+            // Keep only last 30 days to manage storage
+            const dates = Object.keys(history).sort();
+            if (dates.length > 30) {
+                const toDelete = dates.slice(0, dates.length - 30);
+                toDelete.forEach(date => delete history[date]);
+            }
+            
+            localStorage.setItem(historyKey, JSON.stringify(history));
+        } catch (error) {
+            console.error('Error storing historical data:', error);
         }
     }
 
@@ -278,8 +326,9 @@ class HydrationTracker {
         // Track last drink time for smart reminders
         localStorage.setItem('lastDrinkTime', currentTime.toString());
 
-        // Check if daily goal is reached
-        if (this.userData.glassesDrankToday >= this.userData.dailyGoal) {
+        // Check if daily goal is reached for the first time today
+        const goalJustReached = this.userData.glassesDrankToday === this.userData.dailyGoal;
+        if (goalJustReached) {
             this.userData.hydrationStreak++;
             if (this.userData.hydrationStreak > this.userData.bestStreak) {
                 this.userData.bestStreak = this.userData.hydrationStreak;
@@ -293,7 +342,7 @@ class HydrationTracker {
         this.showRandomFact();
 
         // Celebration messages
-        if (this.userData.glassesDrankToday === this.userData.dailyGoal) {
+        if (goalJustReached) {
             this.showNotification("Daily goal achieved! You're a hydration champion!", 'success');
             this.triggerCelebration();
         } else if (this.userData.glassesDrankToday === 1) {
@@ -302,6 +351,8 @@ class HydrationTracker {
             const remaining = this.userData.dailyGoal - this.userData.glassesDrankToday;
             if (remaining > 0) {
                 this.showNotification(`Awesome! ${remaining} more glasses to go!`, 'success');
+            } else {
+                this.showNotification("Excellent! You're exceeding your daily goal!", 'success');
             }
         }
 
@@ -776,7 +827,18 @@ class HydrationTracker {
         if (confirm('Are you sure you want to reset all your data? This action cannot be undone.')) {
             localStorage.removeItem('hydrationData');
             localStorage.removeItem('lastDrinkTime');
+            localStorage.removeItem('hydrationHistory');
             location.reload();
+        }
+    }
+
+    // Add method to get historical data for potential future features
+    getHistoricalData() {
+        try {
+            return JSON.parse(localStorage.getItem('hydrationHistory')) || {};
+        } catch (error) {
+            console.error('Error loading historical data:', error);
+            return {};
         }
     }
 }
