@@ -43,6 +43,7 @@ class HydrationTracker {
     }
 
     init() {
+        this.registerServiceWorker();
         this.setupEventListeners();
         this.requestNotificationPermission();
         this.updateDisplay();
@@ -52,6 +53,22 @@ class HydrationTracker {
         // Check if user is returning
         if (this.userData.userName) {
             this.showWelcomeBackSection();
+        }
+
+        // Prompt for notifications if not set
+        setTimeout(() => {
+            this.checkNotificationPrompt();
+        }, 3000);
+    }
+
+    async registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js');
+                console.log('SW registration successful');
+            } catch (error) {
+                console.log('SW registration failed: ', error);
+            }
         }
     }
 
@@ -161,6 +178,12 @@ class HydrationTracker {
             resetDataBtn.addEventListener('click', () => this.resetAllData());
         }
 
+        // Test notification button
+        const testNotificationBtn = document.getElementById('testNotificationBtn');
+        if (testNotificationBtn) {
+            testNotificationBtn.addEventListener('click', () => this.testNotification());
+        }
+
         // Notification popup close
         const closeNotificationBtn = document.querySelector('.close-notification');
         if (closeNotificationBtn) {
@@ -245,11 +268,15 @@ class HydrationTracker {
 
     drinkWater() {
         const today = new Date().toDateString();
+        const currentTime = new Date().getTime();
         
         // Update drink count
         this.userData.glassesDrankToday++;
         this.userData.totalGlassesDrank++;
         this.userData.lastDrinkDate = today;
+        
+        // Track last drink time for smart reminders
+        localStorage.setItem('lastDrinkTime', currentTime.toString());
 
         // Check if daily goal is reached
         if (this.userData.glassesDrankToday >= this.userData.dailyGoal) {
@@ -267,14 +294,14 @@ class HydrationTracker {
 
         // Celebration messages
         if (this.userData.glassesDrankToday === this.userData.dailyGoal) {
-            this.showNotification("🎉 Daily goal achieved! You're a hydration champion!", 'success');
+            this.showNotification("Daily goal achieved! You're a hydration champion!", 'success');
             this.triggerCelebration();
         } else if (this.userData.glassesDrankToday === 1) {
-            this.showNotification("Great start! First glass of the day 💧", 'success');
+            this.showNotification("Great start! First glass of the day", 'success');
         } else {
             const remaining = this.userData.dailyGoal - this.userData.glassesDrankToday;
             if (remaining > 0) {
-                this.showNotification(`Awesome! ${remaining} more glasses to go! 🚀`, 'success');
+                this.showNotification(`Awesome! ${remaining} more glasses to go!`, 'success');
             }
         }
 
@@ -543,14 +570,39 @@ class HydrationTracker {
     async requestNotificationPermission() {
         if ('Notification' in window) {
             try {
-                this.notificationPermission = await Notification.requestPermission();
-                if (this.notificationPermission === 'granted') {
+                // Check if permission is already granted
+                if (Notification.permission === 'granted') {
+                    this.notificationPermission = 'granted';
                     this.userData.notificationsEnabled = true;
                     this.saveUserData();
+                    return;
+                }
+                
+                // Request permission with user-friendly prompt
+                const permission = await Notification.requestPermission();
+                this.notificationPermission = permission;
+                
+                if (permission === 'granted') {
+                    this.userData.notificationsEnabled = true;
+                    this.saveUserData();
+                    
+                    // Send a welcome notification
+                    setTimeout(() => {
+                        this.sendNotification(
+                            'AquaFlow Notifications Enabled!', 
+                            'You\'ll now receive helpful hydration reminders throughout the day.'
+                        );
+                    }, 1000);
+                } else if (permission === 'denied') {
+                    this.userData.notificationsEnabled = false;
+                    this.saveUserData();
+                    this.showNotification('Notifications blocked. You can enable them in browser settings for hydration reminders.', 'info');
                 }
             } catch (error) {
                 console.error('Error requesting notification permission:', error);
             }
+        } else {
+            this.showNotification('Your browser doesn\'t support notifications.', 'info');
         }
     }
 
@@ -559,11 +611,16 @@ class HydrationTracker {
             try {
                 const notification = new Notification(title, {
                     body: body,
-                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💧</text></svg>',
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%2300ffff"/><text x="50" y="65" text-anchor="middle" font-size="40" fill="white">💧</text></svg>',
                     badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💧</text></svg>',
                     tag: 'hydration-reminder',
                     requireInteraction: false,
-                    silent: false
+                    silent: false,
+                    timestamp: Date.now(),
+                    data: {
+                        url: window.location.origin,
+                        action: 'hydrate'
+                    }
                 });
 
                 notification.onclick = () => {
@@ -571,14 +628,16 @@ class HydrationTracker {
                     notification.close();
                 };
 
-                // Auto-close after 5 seconds
+                // Auto-close after 8 seconds for better mobile experience
                 setTimeout(() => {
-                    notification.close();
-                }, 5000);
+                    if (notification) {
+                        notification.close();
+                    }
+                }, 8000);
 
-                // Vibration for mobile
+                // Enhanced vibration pattern for mobile
                 if ('vibrate' in navigator) {
-                    navigator.vibrate(200);
+                    navigator.vibrate([200, 100, 200]);
                 }
             } catch (error) {
                 console.error('Error sending notification:', error);
@@ -592,39 +651,131 @@ class HydrationTracker {
             clearInterval(this.reminderInterval);
         }
 
-        // Set up reminder every 2 hours (7200000 ms)
+        // Set up reminder every 1.5 hours for more frequent reminders
         this.reminderInterval = setInterval(() => {
+            this.checkAndSendReminder();
+        }, 5400000); // 1.5 hours
+
+        // Also check every 30 minutes for more responsive reminders
+        this.frequentReminderInterval = setInterval(() => {
+            this.checkAndSendFrequentReminder();
+        }, 1800000); // 30 minutes
+
+        // Send initial reminder after 30 minutes if no water drunk
+        setTimeout(() => {
+            this.checkAndSendInitialReminder();
+        }, 1800000);
+    }
+
+    checkAndSendReminder() {
+        const now = new Date();
+        const hours = now.getHours();
+        
+        // Only send reminders during waking hours (7 AM - 10 PM)
+        if (hours >= 7 && hours <= 22 && this.userData.notificationsEnabled) {
+            const progress = this.userData.glassesDrankToday;
+            const goal = this.userData.dailyGoal;
+            
+            if (progress < goal) {
+                const remaining = goal - progress;
+                const userName = this.userData.userName || 'Friend';
+                
+                if (progress === 0) {
+                    this.sendNotification(
+                        `Hey ${userName}! 💧`,
+                        "Time for your first glass of water today! Sip some water and slay the day 💧🔥"
+                    );
+                } else {
+                    const messages = [
+                        `You need ${remaining} more glasses to reach your goal. Keep it up! 🌊`,
+                        `Hydration check! ${remaining} glasses to go, you've got this! 💪`,
+                        `Time for some H2O magic! ${remaining} more glasses needed 💧`,
+                        `Your body is calling for water! ${remaining} glasses remaining 🚰`
+                    ];
+                    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+                    
+                    this.sendNotification(
+                        `Hydration Reminder 💧`,
+                        randomMessage
+                    );
+                }
+            }
+        }
+    }
+
+    checkAndSendFrequentReminder() {
+        const now = new Date();
+        const hours = now.getHours();
+        const lastDrinkTime = localStorage.getItem('lastDrinkTime');
+        const currentTime = now.getTime();
+        
+        // Send reminder if it's been more than 2 hours since last drink
+        if (hours >= 8 && hours <= 21 && this.userData.notificationsEnabled) {
+            if (lastDrinkTime) {
+                const timeSinceLastDrink = currentTime - parseInt(lastDrinkTime);
+                const twoHours = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+                
+                if (timeSinceLastDrink > twoHours && this.userData.glassesDrankToday < this.userData.dailyGoal) {
+                    const userName = this.userData.userName || 'Friend';
+                    this.sendNotification(
+                        `${userName}, time to hydrate! 💧`,
+                        "It's been a while since your last glass. Your body needs water! 🌊"
+                    );
+                }
+            }
+        }
+    }
+
+    checkAndSendInitialReminder() {
+        if (this.userData.glassesDrankToday === 0 && this.userData.notificationsEnabled) {
             const now = new Date();
             const hours = now.getHours();
             
-            // Only send reminders during waking hours (7 AM - 10 PM)
-            if (hours >= 7 && hours <= 22) {
-                const progress = this.userData.glassesDrankToday;
-                const goal = this.userData.dailyGoal;
-                
-                if (progress < goal) {
-                    const remaining = goal - progress;
-                    const userName = this.userData.userName || 'Friend';
-                    
-                    if (progress === 0) {
-                        this.sendNotification(
-                            `Hey ${userName}! 💧`,
-                            "Time for your first glass of water today! Stay hydrated, stay awesome! 🔥"
-                        );
-                    } else {
-                        this.sendNotification(
-                            `Hydration Check! 💧`,
-                            `You need ${remaining} more glasses to reach your goal. Keep it up, ${userName}! 🌊`
-                        );
-                    }
-                }
+            if (hours >= 8 && hours <= 21) {
+                const userName = this.userData.userName || 'Friend';
+                this.sendNotification(
+                    `Good morning ${userName}! ☀️`,
+                    "Start your day right with a refreshing glass of water! 💧"
+                );
             }
-        }, 7200000); // 2 hours
+        }
+    }
+
+    testNotification() {
+        if (this.notificationPermission !== 'granted') {
+            this.requestNotificationPermission().then(() => {
+                if (this.notificationPermission === 'granted') {
+                    this.sendTestNotification();
+                }
+            });
+        } else {
+            this.sendTestNotification();
+        }
+    }
+
+    checkNotificationPrompt() {
+        if (this.userData.userName && !this.userData.notificationsEnabled && 
+            Notification.permission === 'default') {
+            this.showNotification(
+                'Enable notifications to get helpful hydration reminders throughout the day!', 
+                'info'
+            );
+        }
+    }
+
+    sendTestNotification() {
+        const userName = this.userData.userName || 'Friend';
+        this.sendNotification(
+            `Hey ${userName}! 💧`,
+            "This is a test notification! Your hydration reminders are working perfectly."
+        );
+        this.showNotification('Test notification sent! Check your device notifications.', 'success');
     }
 
     resetAllData() {
         if (confirm('Are you sure you want to reset all your data? This action cannot be undone.')) {
             localStorage.removeItem('hydrationData');
+            localStorage.removeItem('lastDrinkTime');
             location.reload();
         }
     }
