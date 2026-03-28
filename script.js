@@ -1,919 +1,676 @@
-class HydrationTracker {
+// ==========================================
+// Aqua Flow — Hydration Tracker v5.0
+// ==========================================
+
+class AquaFlow {
     constructor() {
         this.currentPage = 'home';
         this.userData = this.loadUserData();
-        this.notificationPermission = 'default';
-        this.reminderInterval = null;
-        
-        // Fun facts about hydration
-        this.funFacts = [
-            "75% of your brain is water. Stay sharp 🧠💧",
-            "Your mood improves with every sip 💙",
-            "Hydrate before you dehydrate!",
-            "Water helps your skin glow ✨",
-            "Proper hydration boosts your energy levels ⚡",
-            "Your muscles are 75% water 💪",
-            "Drinking water helps flush out toxins 🌿",
-            "Water regulates your body temperature 🌡️",
-            "Every cell in your body needs water to function",
-            "Dehydration can cause headaches and fatigue",
-            "Water helps transport nutrients throughout your body",
-            "Drinking water can improve your concentration 🎯"
-        ];
-
-        // Achievement definitions
-        this.achievements = [
-            { id: 'first_glass', title: 'First Drop', desc: 'Drink your first glass', icon: '💧', unlocked: false },
-            { id: 'daily_goal', title: 'Daily Champion', desc: 'Complete daily goal', icon: '🏆', unlocked: false },
-            { id: 'three_day_streak', title: 'Commitment', desc: '3-day streak', icon: '🔥', unlocked: false },
-            { id: 'week_streak', title: 'Dedicated', desc: '7-day streak', icon: '📅', unlocked: false },
-            { id: 'hundred_glasses', title: 'Century Club', desc: '100 total glasses', icon: '💯', unlocked: false },
-            { id: 'hydro_hero', title: 'Hydro Hero', desc: 'Reach Hydro Hero level', icon: '🌊', unlocked: false }
-        ];
+        this.swReg = null;
+        this.deferredInstall = null;
+        this.reminderTimers = [];
+        this.comboCount = 0;
+        this.comboTimer = null;
+        this.audioCtx = null;
 
         this.levels = [
-            { name: 'Thirsty Noob', min: 0, max: 49, icon: '💧' },
-            { name: 'Water Warrior', min: 50, max: 149, icon: '⚔️' },
-            { name: 'Hydro Hero', min: 150, max: 299, icon: '🌊' },
-            { name: 'Aqua Legend', min: 300, max: 499, icon: '🏆' },
-            { name: 'Aqua God', min: 500, max: Infinity, icon: '🌌' }
+            { name: 'Thirsty Noob',  icon: '💧', minXP: 0,    maxXP: 49 },
+            { name: 'Water Warrior', icon: '⚔️',  minXP: 50,   maxXP: 149 },
+            { name: 'Hydro Hero',    icon: '🌊',  minXP: 150,  maxXP: 349 },
+            { name: 'Aqua Legend',   icon: '🏆',  minXP: 350,  maxXP: 699 },
+            { name: 'Aqua God',      icon: '🌌',  minXP: 700,  maxXP: Infinity }
         ];
+
+        this.achDefs = [
+            { id: 'first_glass', icon: '💧', title: 'First Drop', desc: 'Drink your first glass', xp: 10, check: d => d.total >= 1 },
+            { id: 'daily_goal',  icon: '🎯', title: 'Daily Champion', desc: 'Hit your daily goal', xp: 50, check: d => d.today >= d.goal },
+            { id: 'streak_3',    icon: '🔥', title: 'On Fire', desc: '3-day streak', xp: 75, check: d => d.streak >= 3 },
+            { id: 'streak_7',    icon: '📅', title: 'Week Warrior', desc: '7-day streak', xp: 150, check: d => d.streak >= 7 },
+            { id: 'streak_30',   icon: '👑', title: 'Monthly Legend', desc: '30-day streak', xp: 750, check: d => d.streak >= 30 },
+            { id: 'ten_today',   icon: '💪', title: 'Overachiever', desc: '10+ glasses in one day', xp: 60, check: d => d.today >= 10 },
+            { id: 'early_bird',  icon: '🌅', title: 'Early Bird', desc: 'Log a glass before 8 AM', xp: 30, check: (d,m) => m && m.h < 8 },
+            { id: 'night_owl',   icon: '🦉', title: 'Night Owl', desc: 'Log a glass after 9 PM', xp: 30, check: (d,m) => m && m.h >= 21 },
+            { id: 'notifications', icon: '🔔', title: 'Smart User', desc: 'Enable notifications', xp: 20, check: d => d.notifs },
+            { id: 'combo_5',     icon: '⚡', title: 'Combo Master', desc: 'Log 5 drinks in 1 hr', xp: 80, check: (d,m) => m && m.combo >= 5 }
+        ];
+
+        this.facts = [
+            "Your brain is 73% water 🧠", "Hydration boosts metabolic rate by 30% 🔥", 
+            "Muscles are 75% water — drink to perform! 💪", "Water flushes toxins naturally 🌿",
+            "Headaches are often dehydration signs 💊", "Warm water aids digestion ☕", 
+            "Hydrated skin looks more radiant ✨", "Cartilage is 80% water 🦴"
+        ];
+
+        this.healthTips = [
+            { icon: '🧠', cat: 'COGNITIVE', text: "Your brain is 73% water. Even minor dehydration can shrink brain tissue, leading to fatigue, mood swings, and impaired short-term memory. Keep sipping to stay sharp!" },
+            { icon: '🔥', cat: 'METABOLISM', text: "Drinking 500ml of water can temporarily increase your metabolic rate by up to 30%. This 'water-induced thermogenesis' helps your body burn calories more efficiently throughout the day." },
+            { icon: '🧪', cat: 'DETOX', text: "Water is the primary engine for your kidneys. It helps filter waste products from your blood and flushes them through your system, preventing the buildup of toxins and maintaining 0-calorie purity." },
+            { icon: '💪', cat: 'RECOVERY', text: "Proper hydration prevents muscle cramping and fatigue by maintaining electrolyte balance. It also lubricates the protein structures in your muscles, aiding faster repair after intense physical activity." },
+            { icon: '🍽️', cat: 'APPETITE', text: "Drinking a glass of water 30 minutes before a meal can naturally reduce hunger and prevent overeating. Your brain often confuses thirst signals with hunger cues—try drinking first!" },
+            { icon: '🍊', cat: 'IMMUNITY', text: "Hydration supports the production of lymph, a fluid that carries white blood cells and other immune system cells throughout the body. Stay hydrated to give your immune defense a natural boost." },
+            { icon: '✨', cat: 'SKIN GLOW', text: "Water provides the essential moisture your skin needs to maintain elasticity and resilience. It helps flush out impurities that cause breakouts, leaving you with a healthy, natural, and radiant glow." },
+            { icon: '⚖️', cat: 'VITALITY', text: "Water regulates your core temperature through sweating and respiration. It also maintains blood volume, ensuring your heart doesn't have to work overtime to deliver oxygen to your cells." },
+            { icon: '🧘', cat: 'MOOD', text: "Research shows that consistent hydration is linked to lower levels of anxiety and tension. Dehydration can trigger a stress response in the body, so sip water to stay calm and collected." },
+            { icon: '🦴', cat: 'JOINTS', text: "Cartilage is roughly 80% water. Proper hydration ensures your joints remain well-lubricated and cushioned, reducing the risk of friction-related pain and long-term wear and tear." }
+        ];
+
+        this.waterTips = [
+            { h: [5, 10], icon: '☀️', temp: 'Warm', tip: 'Warm water in the morning boosts metabolism' },
+            { h: [10, 16], icon: '💧', temp: 'Cold', tip: 'Cold water energizes your afternoon' },
+            { h: [16, 21], icon: '🌄', temp: 'Room', tip: 'Room temp water is gentle for evening' },
+            { h: [21, 5], icon: '🌙', temp: 'Warm', tip: 'Warm water before bed relaxes muscles' }
+        ];
+
+        this.toneDefs = {
+            aqua: [{ f: 523, t: 0, d: 0.1 }, { f: 659, t: 0.1, d: 0.1 }],
+            crystal: [{ f: 880, t: 0, d: 0.05 }, { f: 1760, t: 0.05, d: 0.1 }],
+            wave: [{ f: 220, t: 0, d: 0.3, type: 'triangle' }, { f: 440, t: 0.1, d: 0.4, type: 'sine' }],
+            zen: [{ f: 330, t: 0, d: 0.5, type: 'sine' }],
+            morning: [{ f: 523, t: 0, d: 0.1 }, { f: 587, t: 0.1, d: 0.1 }, { f: 659, t: 0.2, d: 0.2 }]
+        };
 
         this.init();
     }
 
     init() {
-        this.registerServiceWorker();
-        this.setupEventListeners();
-        this.requestNotificationPermission();
-        this.updateDisplay();
-        this.startReminderSystem();
-        this.showRandomFact();
+        this.setupRouting();
+        this.registerSW();
+        this.setupPWA();
+        this.setupEvents();
+        this.updateAll();
+        this.startClock();
         
-        // Check if user is returning
-        if (this.userData.userName) {
-            this.showWelcomeBackSection();
+        if (this.userData.name) {
+            this.showWelcomeBack();
+            this.initTipCarousel();
+        } else {
+            this.initOnboardingInteractivity();
         }
 
-        // Prompt for notifications if not set
-        setTimeout(() => {
-            this.checkNotificationPrompt();
-        }, 3000);
-    }
-
-    async registerServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            try {
-                const registration = await navigator.serviceWorker.register('/sw.js');
-                console.log('SW registration successful');
-            } catch (error) {
-                console.log('SW registration failed: ', error);
-            }
+        // Action from URL
+        const params = new URLSearchParams(location.search);
+        if (params.get('action') === 'drink' || location.pathname.includes('action=drink')) {
+            setTimeout(() => { this.drinkWater(); this.goto('tracker'); }, 1000);
         }
     }
 
+    // ==========================================
+    // DATA
+    // ==========================================
     loadUserData() {
-        const defaultData = {
-            userName: '',
-            glassesDrankToday: 0,
-            lastDrinkDate: null,
-            hydrationStreak: 0,
-            bestStreak: 0,
-            totalGlassesDrank: 0,
-            dailyGoal: 8,
-            notificationsEnabled: false,
-            achievements: []
+        const saved = localStorage.getItem('aquaflowData');
+        const def = {
+            name: '', today: 0, todayML: 0, total: 0, goal: 8, streak: 0, bestStreak: 0, xp: 0,
+            achievements: [], notifs: false, soundEnabled: true, selectedTone: 'aqua',
+            intervalMins: 90, lastDate: new Date().toDateString(), history: [], recentSips: [],
+            selectedMl: 250, sleepMode: false, sleepStart: '22:00', sleepEnd: '07:00',
+            events: []
         };
-
-        try {
-            const saved = localStorage.getItem('hydrationData');
-            const data = saved ? JSON.parse(saved) : defaultData;
-            
-            // Reset daily progress if it's a new day
-            this.checkAndResetDaily(data);
-            
-            return { ...defaultData, ...data };
-        } catch (error) {
-            console.error('Error loading user data:', error);
-            return defaultData;
+        const data = saved ? JSON.parse(saved) : def;
+        if (!data.events) data.events = [];
+        if (data.lastDate !== new Date().toDateString()) {
+            if (data.today < (data.goal || 8)) data.streak = 0;
+            data.history.push({ date: data.lastDate, count: data.today, ml: data.todayML || 0 });
+            if (data.history.length > 30) data.history.shift();
+            data.today = 0; data.todayML = 0; data.recentSips = []; data.lastDate = new Date().toDateString();
+            this.logEvent('Day Reset', `Started new day on ${data.lastDate}`);
         }
+        return { ...def, ...data };
     }
 
-    saveUserData() {
-        try {
-            localStorage.setItem('hydrationData', JSON.stringify(this.userData));
-        } catch (error) {
-            console.error('Error saving user data:', error);
-        }
+    save() { localStorage.setItem('aquaflowData', JSON.stringify(this.userData)); }
+
+    calculateSmartGoal() {
+        const w = parseInt(this.userData.userWeight), act = this.userData.userActivity;
+        if (!w || w < 30) { this.toast('⚠️ Calculator', 'Enter weight in settings!', 'info'); return; }
+        let liters = w * 0.033;
+        if (act === 'moderate') liters *= 1.2;
+        if (act === 'active') liters *= 1.4;
+        const recommended = Math.round(liters / 0.25);
+        this.userData.goal = recommended; this.save(); this.updateAll();
+        document.getElementById('recommendedGoal').textContent = recommended;
+        document.getElementById('calcResult').classList.remove('hidden');
+        this.toast('🎯 New Goal Set', `${recommended} glasses calculated!`, 'success');
     }
 
-    checkAndResetDaily(data) {
-        const today = new Date().toDateString();
-        const lastDate = data.lastDrinkDate;
+    // ==========================================
+    // LOGIC
+    // ==========================================
+    drinkWater() {
+        if (this.checkQuietHours()) { this.toast('😴 Sleep Mode', 'Reminders are paused during sleep.', 'info'); }
+        const ml = this.userData.selectedMl || 250;
+        this.userData.todayML += ml;
+        this.userData.today = Math.round(this.userData.todayML / 250);
+        this.userData.total++;
+        this.userData.lastDate = new Date().toDateString();
+        localStorage.setItem('lastDrinkTime', Date.now());
+
+        // Add to recent sips
+        this.userData.recentSips.unshift({ ml, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+        if (this.userData.recentSips.length > 5) this.userData.recentSips.pop();
+
+        clearTimeout(this.comboTimer);
+        this.comboCount++;
+        this.comboTimer = setTimeout(() => { this.comboCount = 0; this.hideCombo(); }, 3600000); // 1hr combo
+
+        const comboMult = Math.min(this.comboCount, 5);
+        const xp = Math.round((ml / 50) * comboMult);
         
-        if (lastDate && lastDate !== today) {
-            // New day detected - check if we need to update streak
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayString = yesterday.toDateString();
-            
-            if (lastDate === yesterdayString) {
-                // Last drink was yesterday
-                if (data.glassesDrankToday >= data.dailyGoal) {
-                    // Met goal yesterday, maintain streak
-                    console.log('Goal met yesterday, maintaining streak');
-                } else {
-                    // Didn't meet goal yesterday, reset streak
-                    data.hydrationStreak = 0;
-                    console.log('Goal not met yesterday, streak reset');
-                }
-            } else {
-                // Gap in days, reset streak
-                data.hydrationStreak = 0;
-                console.log('Gap in days detected, streak reset');
+        const g = this.getAdjustedGoal();
+        const reached = this.userData.today >= g && (this.userData.today - (ml/250) < g);
+
+        if (reached) {
+            this.userData.streak++;
+            if (this.userData.streak > this.userData.bestStreak) this.userData.bestStreak = this.userData.streak;
+            this.awardXP(100, 'Daily Goal Hit! 🏆');
+            this.playTone('goal');
+            this.triggerConfetti();
+        } else {
+            this.awardXP(xp, `Drank ${ml}ml`);
+            this.playTone('drink');
+        }
+
+        this.save();
+        this.checkAchievements({ h: new Date().getHours(), combo: this.comboCount });
+        this.updateAll();
+        this.animateDrink();
+        this.scheduleNextReminder();
+        if (this.comboCount > 1) this.showCombo(this.comboCount);
+    }
+
+    awardXP(amt, reason) {
+        const pLvl = this.getLevel().name;
+        this.userData.xp += amt;
+        this.save();
+        this.updateXPBar();
+        if (this.getLevel().name !== pLvl) { this.showLevelUp(this.getLevel()); this.playTone('levelup'); }
+    }
+
+    getLevel() {
+        const xp = this.userData.xp || 0;
+        return this.levels.find(l => xp >= l.minXP && xp < l.maxXP) || this.levels[4];
+    }
+
+    getAdjustedGoal() {
+        let g = parseInt(this.userData.goal) || 8;
+        if (this.userData.heatwave) g = Math.ceil(g * 1.2);
+        return g;
+    }
+
+    checkAchievements(meta = {}) {
+        const d = { ...this.userData, ...meta };
+        this.achDefs.forEach(ach => {
+            if (!this.userData.achievements.includes(ach.id) && ach.check(d, meta)) {
+                this.userData.achievements.push(ach.id);
+                this.logEvent('Achievement Unlocked', ach.title);
+                this.save();
+                this.awardXP(ach.xp, `Achievement: ${ach.title}`);
+                this.toast('⭐ Achievement!', ach.title, 'success');
+                this.playTone('achievement');
             }
-            
-            // Always reset daily progress for new day
-            data.glassesDrankToday = 0;
-            
-            // Store yesterday's data in history
-            this.storeHistoricalData(data, lastDate);
-        }
-        
-        // Update last drink date to today
-        data.lastDrinkDate = today;
+        });
     }
 
-    storeHistoricalData(data, date) {
+    logEvent(action, detail) {
+        if (!this.userData.events) this.userData.events = [];
+        this.userData.events.unshift({
+            time: new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            action, detail
+        });
+        if (this.userData.events.length > 50) this.userData.events.pop();
+    }
+
+    showCombo(count) {
+        let el = document.getElementById('comboBadge');
+        if (!el) return;
+        el.textContent = `${count}x Combo! 🔥`;
+        el.classList.remove('hidden');
+        el.classList.add('pulse-anim');
+    }
+
+    hideCombo() {
+        let el = document.getElementById('comboBadge');
+        if (el) el.classList.add('hidden');
+    }
+
+    checkQuietHours() {
+        if (!this.userData.sleepMode) return false;
+        const now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
+        const start = this.userData.sleepStart.split(':').map(Number), startM = start[0]*60 + start[1];
+        const end = this.userData.sleepEnd.split(':').map(Number), endM = end[0]*60 + end[1];
+        return startM > endM ? (nowM >= startM || nowM < endM) : (nowM >= startM && nowM < endM);
+    }
+
+    // ==========================================
+    // UI UPDATES
+    // ==========================================
+    updateAll() {
+        this.updateHomeStats();
+        this.updateTrackerPage();
+        this.updateStatsPage();
+        this.updateAchievements();
+        this.updateNotifStatus();
+        this.updateRecentSips();
+    }
+
+    updateRecentSips() {
+        const list = document.getElementById('recentSipsList');
+        if (!list) return;
+        if (this.userData.recentSips.length === 0) {
+            list.innerHTML = '<div class="empty-activity">No sips logged today yet.</div>';
+            return;
+        }
+        list.innerHTML = this.userData.recentSips.map(s => `
+            <div class="activity-item">
+                <div class="activity-icon">💧</div>
+                <div class="activity-details">
+                    <span class="activity-ml">${s.ml}ml</span>
+                    <span class="activity-time">${s.time}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    updateHomeStats() {
+        const p = this.userData.today, g = this.getAdjustedGoal();
+        const pct = Math.min((p/g)*100, 100);
+        const set = (id,v) => { let el=document.getElementById(id); if(el) el.textContent=v; };
+        set('homeTodayGlasses', p); set('homeTodayGoal', `/${g}`);
+        set('homeStreak', this.userData.streak); set('homeXP', this.userData.xp);
+        set('homeProgressPct', `${Math.round(pct)}%`);
+        let f = document.getElementById('homeProgressFill'); if(f) f.style.width=`${pct}%`;
+        
+        // Mini Level Progress
+        const lvl = this.getLevel();
+        const nLvl = this.levels[this.levels.indexOf(lvl)+1];
+        const lPct = nLvl ? ((this.userData.xp - lvl.minXP) / (nLvl.minXP - lvl.minXP)) * 100 : 100;
+        set('lvlMiniName', `${lvl.icon} ${lvl.name}`);
+        set('lvlMiniXP', `${this.userData.xp} XP`);
+        let mf = document.getElementById('lvlMiniFill'); if(mf) mf.style.width=`${lPct}%`;
+
+        // Update greeting based on time
+        this.updateTimeContext();
+    }
+
+    updateTimeContext() {
+        const h = new Date().getHours();
+        const msg = document.getElementById('timeOfDayMsg');
+        const textWrap = document.querySelector('.greeting-text');
+        if (!msg || !textWrap) return;
+        
+        textWrap.classList.remove('morning-color', 'afternoon-color', 'night-color');
+        if (h >= 0 && h < 12) { 
+            textWrap.classList.add('morning-color'); msg.textContent = 'Good Morning'; 
+        } else if (h >= 12 && h < 16) { 
+            textWrap.classList.add('afternoon-color'); msg.textContent = 'Good Afternoon'; 
+        } else { 
+            textWrap.classList.add('night-color'); msg.textContent = 'Good Evening'; 
+        }
+    }
+
+    startClock() {
+        const update = () => {
+            const now = new Date();
+            const timeEl = document.getElementById('wbDigitalClock');
+            const dayEl = document.getElementById('wbDayBadge');
+            if (timeEl) timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            if (dayEl) dayEl.textContent = now.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short' });
+        };
+        update();
+        setInterval(update, 1000);
+    }
+
+    updateTrackerPage() {
+        const p = this.userData.today, g = this.getAdjustedGoal(), pct = Math.min((p/g)*100, 100);
+        const set = (id,v) => { let el=document.getElementById(id); if(el) el.textContent=v; };
+        set('currentGlasses', p); set('dailyGoal', g); set('progressText', `${Math.round(pct)}%`);
+        set('currentStreak', this.userData.streak); set('trackerXP', this.userData.xp);
+        
+        const lvl = this.getLevel();
+        set('currentLevel', lvl.name.split(' ')[1] || lvl.name);
+
+        let f=document.getElementById('progressFill'), wf=document.getElementById('waterFill');
+        if(f) f.style.width=`${pct}%`; if(wf) wf.style.height=`${pct}%`;
+        let lbl=document.getElementById('glassLabel');
+        if(lbl) lbl.textContent = p>=g?'Goal reached! 🏆':(p>g/2?'Looking good! 🔥':'Keep drinking! 💧');
+        this.updateXPBar();
+    }
+
+    updateXPBar() {
+        const lvl = this.getLevel(), xp = this.userData.xp;
+        const nLvl = this.levels[this.levels.indexOf(lvl)+1];
+        const pct = nLvl ? ((xp - lvl.minXP) / (nLvl.minXP - lvl.minXP)) * 100 : 100;
+        const set = (id,v) => { let el=document.getElementById(id); if(el) el.textContent=v; };
+        set('xpLevelName', `${lvl.icon} ${lvl.name}`); set('xpAmount', `${xp} XP`);
+        let f=document.getElementById('xpFill'); if(f) f.style.width=`${pct}%`;
+        set('xpNext', nLvl ? `${nLvl.minXP - xp} XP to level up` : 'Max level achieved! 🌌');
+    }
+
+
+
+    updateStatsPage() {
+        const p = this.userData.today, g = this.getAdjustedGoal(), pct = Math.min((p/g)*100, 100);
+        const set = (id,v) => { let el=document.getElementById(id); if(el) el.textContent=v; };
+        set('totalGlassesCount', this.userData.total); set('bestStreak', this.userData.bestStreak); set('totalXPCount', this.userData.xp); set('todayPercent', `${Math.round(pct)}%`);
+        let c=document.getElementById('todayCircle'); if(c) c.style.strokeDashoffset = 314 - (314 * pct/100);
+        let h=document.getElementById('weeklyHeatmap'); if(!h) return;
+        h.innerHTML = (this.userData.history || []).slice(-7).map(d => `<div class="wb-col"><div class="wb-bar ${d.count>=8?'wb-full':'wb-partial'}" style="height:${Math.min(d.count*10,100)}%"></div></div>`).join('');
+    }
+
+    // ==========================================
+    // NOTIFICATIONS
+    // ==========================================
+    async requestNotifPerm() {
+        if (!('Notification' in window)) return;
+        const res = await Notification.requestPermission();
+        this.userData.notifs = (res === 'granted');
+        this.save(); this.updateNotifStatus();
+        if(res === 'granted') this.toast('🔔 Enabled!', 'You will get sips reminders.', 'success');
+    }
+
+    updateNotifStatus() {
+        let el = document.getElementById('notifStatus'); if(!el) return;
+        let perm = Notification.permission;
+        el.textContent = perm === 'granted' ? 'Active' : (perm === 'denied' ? 'Blocked' : 'Tap to Enable');
+        el.className = `notif-status notif-${perm === 'granted'?'ok':(perm==='denied'?'denied':'default')}`;
+    }
+
+    scheduleNextReminder() {
+        if(!this.userData.notifs) return;
+        this.reminderTimers.forEach(clearTimeout);
+        // Local timer for when app is active
+        const delay = (this.userData.intervalMins || 90) * 60000;
+        this.reminderTimers.push(setTimeout(() => {
+            if(!this.checkQuietHours()) this.sendSysNotif('💧 Sip Check!', 'Getting a bit thirsty? Stay hydrated! 🌊');
+            this.scheduleNextReminder();
+        }, delay));
+
+        // Background / SW Scheduling
+        if (this.swReg) {
+            this.swReg.active?.postMessage({
+                type: 'SCHEDULE_REMINDER',
+                data: { ...this.userData, glasses: this.userData.today, delayMs: delay }
+            });
+        }
+    }
+
+    sendSysNotif(title, body) {
+        if(!this.userData.notifs || Notification.permission !== 'granted') return;
+        if(this.swReg) this.swReg.showNotification(title, { body, icon: '/icons/icon-192.png', vibrate: [200, 100, 200], actions: [{action:'drink', title:'Log Sip'}] });
+        this.playTone('reminder');
+    }
+
+    // ==========================================
+    // HELPERS & EVENTS
+    // ==========================================
+    setupEvents() {
+        document.querySelectorAll('[data-page]').forEach(el => el.onclick = () => this.goto(el.dataset.page));
+        let goBtn = document.getElementById('startJourney'); if(goBtn) goBtn.onclick = () => this.startJourney();
+        let drkBtn = document.getElementById('drinkBtn'); if(drkBtn) drkBtn.onclick = () => this.drinkWater();
+        
+        let wgtIn = document.getElementById('userWeight'); if(wgtIn) { wgtIn.value = this.userData.userWeight || ''; wgtIn.oninput = e => { this.userData.userWeight = e.target.value; this.save(); }; }
+        let actSlc = document.getElementById('userActivity'); if(actSlc) { actSlc.value = this.userData.userActivity || 'moderate'; actSlc.onchange = e => { this.userData.userActivity = e.target.value; this.save(); }; }
+        let calcBtn = document.getElementById('calcGoalBtn'); if(calcBtn) calcBtn.onclick = () => this.calculateSmartGoal();
+
+        let hwTgl = document.getElementById('heatwaveToggle'); if(hwTgl) { hwTgl.checked = !!this.userData.heatwave; hwTgl.onchange = e => { this.userData.heatwave = e.target.checked; this.save(); this.updateAll(); }; }
+
+        document.querySelectorAll('.size-btn').forEach(btn => btn.onclick = () => {
+            document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
+            this.userData.selectedMl = parseInt(btn.dataset.ml); this.save();
+        });
+
+        let ntBtn = document.getElementById('notificationsToggle'); if(ntBtn) ntBtn.onclick = () => this.requestNotifPerm();
+        let testBtn = document.getElementById('testNotificationBtn'); if(testBtn) testBtn.onclick = () => this.sendSysNotif('💧 Test Drink Reminder!', 'Aqua Flow is working! Stay hydrated. 🌊');
+        let soundTgl = document.getElementById('soundToggle'); if(soundTgl) { soundTgl.checked = this.userData.soundEnabled; soundTgl.onchange = e => { this.userData.soundEnabled = e.target.checked; this.save(); }; }
+        let toneSlc = document.getElementById('toneSelect'); if(toneSlc) { toneSlc.value = this.userData.selectedTone || 'aqua'; toneSlc.onchange = e => { this.userData.selectedTone = e.target.value; this.save(); this.playTone('drink'); }; }
+        let testSnd = document.getElementById('testSoundBtn'); if(testSnd) testSnd.onclick = () => this.playTone('reminder');
+
+        // Modal buttons
+        let nEnb = document.getElementById('notif-enable-btn'); if(nEnb) nEnb.onclick = () => { this.requestNotifPerm(); this.closeNotifModal(); };
+        let nLat = document.getElementById('notif-later-btn'); if(nLat) nLat.onclick = () => this.closeNotifModal();
+        
+        // History & Settings
+        let vhBtn = document.getElementById('viewHistoryBtn'); if(vhBtn) vhBtn.onclick = () => this.showHistory();
+        let chBtn = document.getElementById('closeHistoryBtn'); if(chBtn) chBtn.onclick = () => document.getElementById('history-modal').classList.add('hidden');
+        
+        let resBtn = document.getElementById('resetDataBtn'); if(resBtn) resBtn.onclick = () => {
+            if (confirm('Are you sure you want to reset all progress? This cannot be undone.')) {
+                localStorage.clear();
+                window.location.reload();
+            }
+        };
+        
+        // Urgency
+        document.querySelectorAll('.history-tab').forEach(t => t.onclick = () => {
+            document.querySelectorAll('.history-tab').forEach(x => x.classList.remove('active'));
+            t.classList.add('active'); this.updateHistoryBody(t.dataset.tab);
+        });
+
+        let instBtn = document.getElementById('installActionBtn'); if(instBtn) instBtn.onclick = () => this.installPWA();
+        let closeInst = document.getElementById('closeInstallBanner'); if(closeInst) closeInst.onclick = () => {
+            document.getElementById('installBanner').classList.add('hidden');
+            localStorage.setItem('pwaPrompted', 'true');
+        };
+    }
+
+
+
+    // ==========================================
+    // HISTORY
+    // ==========================================
+    showHistory() {
+        const m = document.getElementById('history-modal');
+        if (m) { m.classList.remove('hidden'); this.updateHistoryBody('recent'); }
+    }
+
+    updateHistoryBody(tab) {
+        const body = document.getElementById('historyBody');
+        const thead = document.getElementById('historyThead');
+        if (!body || !thead) return;
+
+        if (tab === 'recent') {
+            thead.innerHTML = '<tr><th>Time</th><th>Action</th><th>Amount</th></tr>';
+            if (!this.userData.recentSips || this.userData.recentSips.length === 0) { body.innerHTML = '<tr><td colspan="3" class="empty-history">No sips recorded today.</td></tr>'; return; }
+            body.innerHTML = this.userData.recentSips.map(s => `<tr><td>${s.time}</td><td><span class="history-chip">💧 Sip</span></td><td><strong>${s.ml}ml</strong></td></tr>`).join('');
+        } else if (tab === 'weekly') {
+            thead.innerHTML = '<tr><th>Date</th><th>Glasses</th><th>Status</th></tr>';
+            if (!this.userData.history || this.userData.history.length === 0) { body.innerHTML = '<tr><td colspan="3" class="empty-history">No past records found.</td></tr>'; return; }
+            body.innerHTML = this.userData.history.map(h => `<tr><td>${h.date}</td><td><strong>${h.count}</strong></td><td><span class="history-chip ${h.count >= this.userData.goal ? 'success' : ''}">${h.count >= this.userData.goal ? 'Done' : 'Missed'}</span></td></tr>`).join('');
+        } else if (tab === 'events') {
+            thead.innerHTML = '<tr><th>Date/Time</th><th>Event</th><th>Description</th></tr>';
+            if (!this.userData.events || this.userData.events.length === 0) { body.innerHTML = '<tr><td colspan="3" class="empty-history">No events recorded.</td></tr>'; return; }
+            body.innerHTML = this.userData.events.map(e => `<tr><td>${e.time}</td><td><span class="history-chip neutral">${e.action}</span></td><td>${e.detail}</td></tr>`).join('');
+        }
+    }
+
+    // ==========================================
+    // ONBOARDING
+    // ==========================================
+    initOnboardingInteractivity() {
+        const input = document.getElementById('userName');
+        const bar = document.getElementById('onboardingBar');
+        const liquid = document.getElementById('onboardingLiquid');
+        if (!input) return;
+        input.oninput = () => {
+            const pct = Math.min((input.value.length / 10) * 100, 100);
+            if (bar) bar.style.width = `${pct}%`;
+            if (liquid) liquid.style.height = `${pct/2}%`;
+        };
+    }
+
+    maybeShowNotifModal() {
+        if (Notification.permission === 'default' && !this.userData.notifs) {
+            let m = document.getElementById('notif-modal'); if(m) { m.classList.remove('hidden'); setTimeout(()=>m.classList.add('visible'), 50); }
+        }
+    }
+
+    closeNotifModal() { let m = document.getElementById('notif-modal'); if(m) { m.classList.remove('visible'); setTimeout(()=>m.classList.add('hidden'), 350); } }
+
+    setupRouting() {
+        const map = { '/': 'home', '/home': 'home', '/tracker': 'tracker', '/stats': 'stats', '/settings': 'about', '/about': 'about' };
+        const page = map[location.pathname] || 'home';
+        this.currentPage = page;
+        this._switchPage(page);
+        window.addEventListener('popstate', e => { if (e.state?.page) this._switchPage(e.state.page); });
+    }
+
+    goto(page) {
+        const urlMap = { home: '/', tracker: '/tracker', stats: '/stats', about: '/settings' };
+        history.pushState({ page }, '', urlMap[page] || '/');
+        this._switchPage(page);
+    }
+
+    getAudioCtx() {
+        if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return this.audioCtx;
+    }
+
+    playTone(type = 'drink') {
+        if (!this.userData.soundEnabled) return;
         try {
-            const historyKey = 'hydrationHistory';
-            let history = JSON.parse(localStorage.getItem(historyKey)) || {};
-            
-            // Store the day's data
-            history[date] = {
-                glasses: data.glassesDrankToday,
-                goal: data.dailyGoal,
-                goalMet: data.glassesDrankToday >= data.dailyGoal,
-                streak: data.hydrationStreak
+            const ctx = this.getAudioCtx();
+            const toneKey = (type === 'reminder') ? (this.userData.selectedTone || 'aqua') : 'aqua';
+            const extra = {
+                achievement: [{ f: 440, t: 0, d: 0.1 }, { f: 880, t: 0.2, d: 0.2 }],
+                levelup: [{ f: 523, t: 0, d: 0.2 }, { f: 1047, t: 0.2, d: 0.3 }],
+                goal: [{ f: 523, t: 0, d: 0.1 }, { f: 784, t: 0.2, d: 0.3 }]
             };
-            
-            // Keep only last 30 days to manage storage
-            const dates = Object.keys(history).sort();
-            if (dates.length > 30) {
-                const toDelete = dates.slice(0, dates.length - 30);
-                toDelete.forEach(date => delete history[date]);
-            }
-            
-            localStorage.setItem(historyKey, JSON.stringify(history));
-        } catch (error) {
-            console.error('Error storing historical data:', error);
-        }
+            const seq = extra[type] || this.toneDefs[toneKey] || this.toneDefs.aqua;
+            const now = ctx.currentTime;
+            seq.forEach(({ f, t, d, type: oscType }) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = oscType || 'sine';
+                osc.frequency.value = f;
+                gain.gain.setValueAtTime(0.1, now + t);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(now + t); osc.stop(now + t + d);
+            });
+        } catch (_) {}
     }
 
-    setupEventListeners() {
-        // Navigation
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const page = e.target.dataset.page;
-                this.navigateToPage(page);
-            });
+    _switchPage(page) {
+        document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `${page}-page`));
+        document.querySelectorAll('.nav-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.page === page);
+            b.setAttribute('aria-selected', b.dataset.page === page ? 'true' : 'false');
         });
-
-        // Home page actions
-        const startJourneyBtn = document.getElementById('startJourney');
-        const userNameInput = document.getElementById('userName');
-        
-        if (startJourneyBtn) {
-            startJourneyBtn.addEventListener('click', () => this.startJourney());
-        }
-        
-        if (userNameInput) {
-            userNameInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.startJourney();
-            });
-        }
-
-        // Tracker page actions
-        const drinkBtn = document.getElementById('drinkBtn');
-        if (drinkBtn) {
-            drinkBtn.addEventListener('click', () => this.drinkWater());
-        }
-
-        // Settings
-        const dailyGoalInput = document.getElementById('dailyGoalInput');
-        const notificationsToggle = document.getElementById('notificationsToggle');
-        const resetDataBtn = document.getElementById('resetDataBtn');
-
-        if (dailyGoalInput) {
-            dailyGoalInput.addEventListener('change', (e) => {
-                this.userData.dailyGoal = parseInt(e.target.value);
-                this.saveUserData();
-                this.updateDisplay();
-            });
-        }
-
-        if (notificationsToggle) {
-            notificationsToggle.addEventListener('change', (e) => {
-                this.userData.notificationsEnabled = e.target.checked;
-                this.saveUserData();
-                if (e.target.checked) {
-                    this.requestNotificationPermission();
-                }
-            });
-        }
-
-        if (resetDataBtn) {
-            resetDataBtn.addEventListener('click', () => this.resetAllData());
-        }
-
-        // Test notification button
-        const testNotificationBtn = document.getElementById('testNotificationBtn');
-        if (testNotificationBtn) {
-            testNotificationBtn.addEventListener('click', () => this.testNotification());
-        }
-
-        // Notification popup close
-        const closeNotificationBtn = document.querySelector('.close-notification');
-        if (closeNotificationBtn) {
-            closeNotificationBtn.addEventListener('click', () => {
-                document.getElementById('notification-popup').classList.add('hidden');
-            });
-        }
-    }
-
-    navigateToPage(page) {
-        // Hide all pages
-        document.querySelectorAll('.page').forEach(p => {
-            p.classList.remove('active');
-        });
-
-        // Show target page
-        const targetPage = document.getElementById(`${page}-page`);
-        if (targetPage) {
-            targetPage.classList.add('active');
-            this.currentPage = page;
-        }
-
-        // Update navigation
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        
-        const activeBtn = document.querySelector(`[data-page="${page}"]`);
-        if (activeBtn) {
-            activeBtn.classList.add('active');
-        }
-
-        // Update display for the current page
-        this.updateDisplay();
+        this.currentPage = page;
+        this.updateAll();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     startJourney() {
-        const nameInput = document.getElementById('userName');
-        const name = nameInput.value.trim();
-        
-        if (!name) {
-            this.showNotification('Please enter your name!', 'error');
-            return;
-        }
-
-        this.userData.userName = name;
-        this.userData.lastDrinkDate = new Date().toDateString();
-        this.saveUserData();
-        
-        this.showWelcomeBackSection();
-        this.showNotification(`Welcome to AquaFlow, ${name}! 🌊`, 'success');
-        
-        // Auto-navigate to tracker after a moment
-        setTimeout(() => {
-            this.navigateToPage('tracker');
-        }, 2000);
+        let name = document.getElementById('userName').value.trim();
+        if(!name) return; this.userData.name = name; this.save();
+        this.showWelcomeBack(); this.goto('tracker');
     }
 
-    showWelcomeBackSection() {
-        const welcomeSection = document.getElementById('welcome-section');
-        const welcomeBackSection = document.getElementById('welcome-back-section');
-        const userNameDisplay = document.getElementById('userNameDisplay');
-        const hydrationStatus = document.getElementById('hydrationStatus');
-
-        if (welcomeSection) welcomeSection.classList.add('hidden');
-        if (welcomeBackSection) welcomeBackSection.classList.remove('hidden');
-        if (userNameDisplay) userNameDisplay.textContent = this.userData.userName;
-        
-        if (hydrationStatus) {
-            const progress = this.userData.glassesDrankToday;
-            const goal = this.userData.dailyGoal;
-            
-            if (progress === 0) {
-                hydrationStatus.textContent = "You haven't hydrated yet. Drink now! 💧";
-            } else if (progress < goal) {
-                hydrationStatus.textContent = `${progress}/${goal} glasses down. Keep going! 🚀`;
-            } else {
-                hydrationStatus.textContent = "You're fully hydrated! 🥳💧";
-            }
-        }
+    showWelcomeBack() {
+        let ws=document.getElementById('welcome-section'), wbs=document.getElementById('welcome-back-section');
+        if(ws) ws.classList.add('hidden'); if(wbs) wbs.classList.remove('hidden');
+        let n=document.getElementById('userNameDisplay'); if(n) n.textContent = this.userData.name;
     }
 
-    drinkWater() {
-        const today = new Date().toDateString();
-        const currentTime = new Date().getTime();
-        
-        // Update drink count
-        this.userData.glassesDrankToday++;
-        this.userData.totalGlassesDrank++;
-        this.userData.lastDrinkDate = today;
-        
-        // Track last drink time for smart reminders
-        localStorage.setItem('lastDrinkTime', currentTime.toString());
-
-        // Check if daily goal is reached for the first time today
-        const goalJustReached = this.userData.glassesDrankToday === this.userData.dailyGoal;
-        if (goalJustReached) {
-            this.userData.hydrationStreak++;
-            if (this.userData.hydrationStreak > this.userData.bestStreak) {
-                this.userData.bestStreak = this.userData.hydrationStreak;
+    async registerSW() { if('serviceWorker' in navigator) this.swReg = await navigator.serviceWorker.register('/sw.js'); }
+    setupPWA() { 
+        window.addEventListener('beforeinstallprompt', e => { 
+            e.preventDefault(); 
+            this.deferredInstall = e; 
+            // Show install banner if they haven't seen it recently
+            if (!localStorage.getItem('pwaPrompted') && this.userData.name) {
+                this.showInstallBanner();
             }
-        }
+        }); 
+    }
 
-        this.saveUserData();
-        this.updateDisplay();
-        this.checkAchievements();
-        this.animateWaterFill();
+    showInstallBanner() {
+        let b = document.getElementById('installBanner');
+        if (b) { b.classList.remove('hidden'); setTimeout(()=>b.classList.add('visible'), 50); }
+    }
+
+    async installPWA() {
+        if (!this.deferredInstall) return;
+        this.deferredInstall.prompt();
+        const { outcome } = await this.deferredInstall.userChoice;
+        if (outcome === 'accepted') {
+            this.awardXP(100, 'Installed Aqua Flow 📱');
+            localStorage.setItem('pwaPrompted', 'true');
+            let b = document.getElementById('installBanner');
+            if (b) b.classList.add('hidden');
+        }
+        this.deferredInstall = null;
+    }
+
+    toast(title, msg, type) {
+        let p=document.getElementById('toast-popup'); if(!p) return;
+        document.getElementById('toastTitle').textContent=title; document.getElementById('toastMsg').textContent=msg;
+        p.className = `toast-popup toast-${type}`; p.classList.remove('hidden');
+        setTimeout(() => p.classList.add('hidden'), 4000);
+    }
+
+    animateDrink() { 
+        let b = document.getElementById('drinkBtn'); if (b) { b.classList.add('drinking'); setTimeout(() => b.classList.remove('drinking'), 600); } 
         this.showRandomFact();
-
-        // Celebration messages
-        if (goalJustReached) {
-            this.showNotification("Daily goal achieved! You're a hydration champion!", 'success');
-            this.triggerCelebration();
-        } else if (this.userData.glassesDrankToday === 1) {
-            this.showNotification("Great start! First glass of the day", 'success');
-        } else {
-            const remaining = this.userData.dailyGoal - this.userData.glassesDrankToday;
-            if (remaining > 0) {
-                this.showNotification(`Awesome! ${remaining} more glasses to go!`, 'success');
-            } else {
-                this.showNotification("Excellent! You're exceeding your daily goal!", 'success');
-            }
-        }
-
-        // Haptic feedback for mobile
-        if ('vibrate' in navigator) {
-            navigator.vibrate(100);
-        }
-    }
-
-    animateWaterFill() {
-        const waterFill = document.getElementById('waterFill');
-        if (!waterFill) return;
-
-        const progress = this.userData.glassesDrankToday;
-        const goal = this.userData.dailyGoal;
-        const percentage = Math.min((progress / goal) * 100, 100);
-        
-        waterFill.style.height = `${percentage}%`;
-
-        // Add animation effect
-        waterFill.classList.add('filling');
-        setTimeout(() => {
-            waterFill.classList.remove('filling');
-        }, 800);
-    }
-
-    updateDisplay() {
-        this.updateTrackerDisplay();
-        this.updateStatsDisplay();
-        this.updateSettingsDisplay();
-    }
-
-    updateTrackerDisplay() {
-        const currentGlasses = document.getElementById('currentGlasses');
-        const dailyGoal = document.getElementById('dailyGoal');
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
-        const currentStreak = document.getElementById('currentStreak');
-        const currentLevel = document.getElementById('currentLevel');
-
-        if (currentGlasses) currentGlasses.textContent = this.userData.glassesDrankToday;
-        if (dailyGoal) dailyGoal.textContent = this.userData.dailyGoal;
-
-        const progress = this.userData.glassesDrankToday;
-        const goal = this.userData.dailyGoal;
-        const percentage = Math.min((progress / goal) * 100, 100);
-
-        if (progressFill) progressFill.style.width = `${percentage}%`;
-        if (progressText) progressText.textContent = `${Math.round(percentage)}%`;
-
-        if (currentStreak) currentStreak.textContent = this.userData.hydrationStreak;
-
-        const level = this.getCurrentLevel();
-        if (currentLevel) currentLevel.textContent = level.name;
-
-        // Update water glass fill
-        this.animateWaterFill();
-    }
-
-    updateStatsDisplay() {
-        const totalGlassesCount = document.getElementById('totalGlassesCount');
-        const bestStreak = document.getElementById('bestStreak');
-        const levelName = document.getElementById('levelName');
-        const levelFill = document.getElementById('levelFill');
-        const levelProgress = document.getElementById('levelProgress');
-        const todayCircle = document.getElementById('todayCircle');
-        const todayPercent = document.getElementById('todayPercent');
-
-        if (totalGlassesCount) totalGlassesCount.textContent = this.userData.totalGlassesDrank;
-        if (bestStreak) bestStreak.textContent = this.userData.bestStreak;
-
-        const level = this.getCurrentLevel();
-        if (levelName) levelName.textContent = level.name;
-
-        // Level progress
-        const levelProgressValue = this.userData.totalGlassesDrank - level.min;
-        const levelMaxProgress = level.max === Infinity ? level.min + 500 : level.max - level.min;
-        const levelPercentage = Math.min((levelProgressValue / levelMaxProgress) * 100, 100);
-
-        if (levelFill) levelFill.style.width = `${levelPercentage}%`;
-        if (levelProgress) {
-            const nextMilestone = level.max === Infinity ? level.min + 500 : level.max;
-            levelProgress.textContent = `${this.userData.totalGlassesDrank}/${nextMilestone}`;
-        }
-
-        // Today's circular progress
-        const todayProgress = this.userData.glassesDrankToday;
-        const todayGoal = this.userData.dailyGoal;
-        const todayPercentage = Math.min((todayProgress / todayGoal) * 100, 100);
-
-        if (todayCircle) {
-            const circumference = 314; // 2 * π * 50
-            const strokeDashoffset = circumference - (circumference * todayPercentage) / 100;
-            todayCircle.style.strokeDashoffset = strokeDashoffset;
-        }
-
-        if (todayPercent) todayPercent.textContent = `${Math.round(todayPercentage)}%`;
-
-        // Update achievements
-        this.updateAchievementsDisplay();
-    }
-
-    updateSettingsDisplay() {
-        const dailyGoalInput = document.getElementById('dailyGoalInput');
-        const notificationsToggle = document.getElementById('notificationsToggle');
-
-        if (dailyGoalInput) dailyGoalInput.value = this.userData.dailyGoal;
-        if (notificationsToggle) notificationsToggle.checked = this.userData.notificationsEnabled;
-    }
-
-    updateAchievementsDisplay() {
-        const achievementsGrid = document.getElementById('achievementsGrid');
-        if (!achievementsGrid) return;
-
-        achievementsGrid.innerHTML = '';
-
-        this.achievements.forEach(achievement => {
-            const isUnlocked = this.userData.achievements.includes(achievement.id);
-            
-            const achievementElement = document.createElement('div');
-            achievementElement.className = `achievement-item ${isUnlocked ? 'unlocked' : ''}`;
-            achievementElement.innerHTML = `
-                <div class="achievement-icon">${achievement.icon}</div>
-                <div class="achievement-title">${achievement.title}</div>
-                <div class="achievement-desc">${achievement.desc}</div>
-            `;
-            
-            achievementsGrid.appendChild(achievementElement);
-        });
-    }
-
-    getCurrentLevel() {
-        const total = this.userData.totalGlassesDrank;
-        return this.levels.find(level => total >= level.min && total < level.max) || this.levels[0];
-    }
-
-    checkAchievements() {
-        const newAchievements = [];
-
-        // First glass
-        if (this.userData.totalGlassesDrank >= 1 && !this.userData.achievements.includes('first_glass')) {
-            newAchievements.push('first_glass');
-        }
-
-        // Daily goal
-        if (this.userData.glassesDrankToday >= this.userData.dailyGoal && !this.userData.achievements.includes('daily_goal')) {
-            newAchievements.push('daily_goal');
-        }
-
-        // Streaks
-        if (this.userData.hydrationStreak >= 3 && !this.userData.achievements.includes('three_day_streak')) {
-            newAchievements.push('three_day_streak');
-        }
-
-        if (this.userData.hydrationStreak >= 7 && !this.userData.achievements.includes('week_streak')) {
-            newAchievements.push('week_streak');
-        }
-
-        // Total glasses
-        if (this.userData.totalGlassesDrank >= 100 && !this.userData.achievements.includes('hundred_glasses')) {
-            newAchievements.push('hundred_glasses');
-        }
-
-        // Level achievements
-        const currentLevel = this.getCurrentLevel();
-        if (currentLevel.name === 'Hydro Hero' && !this.userData.achievements.includes('hydro_hero')) {
-            newAchievements.push('hydro_hero');
-        }
-
-        // Add new achievements and show notifications
-        newAchievements.forEach(achievementId => {
-            this.userData.achievements.push(achievementId);
-            const achievement = this.achievements.find(a => a.id === achievementId);
-            if (achievement) {
-                this.showNotification(`🏆 Achievement Unlocked: ${achievement.title}!`, 'achievement');
-                this.triggerCelebration();
-            }
-        });
-
-        if (newAchievements.length > 0) {
-            this.saveUserData();
-        }
     }
 
     showRandomFact() {
-        const factElement = document.getElementById('funFact');
-        if (!factElement) return;
-
-        const randomFact = this.funFacts[Math.floor(Math.random() * this.funFacts.length)];
-        factElement.textContent = randomFact;
-
-        // Animate fact change
-        factElement.style.opacity = '0';
-        setTimeout(() => {
-            factElement.style.opacity = '1';
-        }, 200);
+        const el = document.getElementById('funFact'); if(!el) return;
+        el.textContent = this.facts[Math.floor(Math.random()*this.facts.length)];
     }
 
-    showNotification(message, type = 'info') {
-        const popup = document.getElementById('notification-popup');
-        const messageElement = document.getElementById('notification-message');
-
-        if (!popup || !messageElement) return;
-
-        messageElement.textContent = message;
-        popup.classList.remove('hidden');
-
-        // Auto-hide after 4 seconds
-        setTimeout(() => {
-            popup.classList.add('hidden');
-        }, 4000);
+    updateAchievements() {
+        const grid = document.getElementById('achievementsGrid'); if(!grid) return;
+        grid.innerHTML = this.achDefs.map(ach => {
+            const earned = this.userData.achievements.includes(ach.id);
+            return `<div class="ach-card ${earned?'earned':'locked'}"><div class="ach-icon">${ach.icon}</div><div class="ach-info"><div class="ach-title">${ach.title}</div><div class="ach-desc">${ach.desc}</div></div></div>`;
+        }).join('');
     }
 
-    triggerCelebration() {
-        // Add celebration animation class to body
-        document.body.classList.add('celebrating');
-        
-        // Create floating celebration elements
-        this.createConfetti();
-        
-        // Remove celebration class after animation
-        setTimeout(() => {
-            document.body.classList.remove('celebrating');
-        }, 2000);
+    showLevelUp(lvl) {
+        let o = document.getElementById('level-up-overlay'); if(!o) return;
+        document.getElementById('levelUpEmoji').textContent = lvl.icon;
+        document.getElementById('levelUpName').textContent = lvl.name;
+        o.classList.remove('hidden'); setTimeout(()=>o.classList.add('visible'), 50);
+        this.triggerConfetti();
+    }
 
-        // Haptic feedback
-        if ('vibrate' in navigator) {
-            navigator.vibrate([100, 50, 100]);
+    triggerConfetti() {
+        let c = document.createElement('div'); c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9999;';
+        for(let i=0; i<30; i++) {
+            let p=document.createElement('div'); p.textContent=['💧','✨','⭐','🌊','💎'][Math.floor(Math.random()*5)];
+            p.style.cssText=`position:absolute;left:${Math.random()*100}%;top:-50px;font-size:${15+Math.random()*20}px;animation:cFall ${2+Math.random()*2}s linear forwards;`;
+            c.appendChild(p);
         }
+        document.body.appendChild(c); setTimeout(()=>c.remove(), 5000);
     }
 
-    createConfetti() {
-        const confettiContainer = document.createElement('div');
-        confettiContainer.style.position = 'fixed';
-        confettiContainer.style.top = '0';
-        confettiContainer.style.left = '0';
-        confettiContainer.style.width = '100%';
-        confettiContainer.style.height = '100%';
-        confettiContainer.style.pointerEvents = 'none';
-        confettiContainer.style.zIndex = '9999';
-
-        const colors = ['#00ffff', '#ff00ff', '#8b00ff', '#ffffff'];
-        const emojis = ['💧', '🌊', '⭐', '✨', '🎉'];
-
-        for (let i = 0; i < 20; i++) {
-            const confetti = document.createElement('div');
-            confetti.textContent = Math.random() > 0.5 ? emojis[Math.floor(Math.random() * emojis.length)] : '●';
-            confetti.style.position = 'absolute';
-            confetti.style.left = Math.random() * 100 + '%';
-            confetti.style.top = '-10px';
-            confetti.style.fontSize = Math.random() * 20 + 10 + 'px';
-            confetti.style.color = colors[Math.floor(Math.random() * colors.length)];
-            confetti.style.animation = `confettiFall ${Math.random() * 2 + 2}s linear forwards`;
-            
-            confettiContainer.appendChild(confetti);
-        }
-
-        document.body.appendChild(confettiContainer);
-
-        // Remove confetti after animation
-        setTimeout(() => {
-            document.body.removeChild(confettiContainer);
-        }, 4000);
-    }
-
-    async requestNotificationPermission() {
-        if ('Notification' in window) {
-            try {
-                // Check if permission is already granted
-                if (Notification.permission === 'granted') {
-                    this.notificationPermission = 'granted';
-                    this.userData.notificationsEnabled = true;
-                    this.saveUserData();
-                    return;
-                }
-                
-                // Request permission with user-friendly prompt
-                const permission = await Notification.requestPermission();
-                this.notificationPermission = permission;
-                
-                if (permission === 'granted') {
-                    this.userData.notificationsEnabled = true;
-                    this.saveUserData();
-                    
-                    // Send a welcome notification
-                    setTimeout(() => {
-                        this.sendNotification(
-                            'AquaFlow Notifications Enabled!', 
-                            'You\'ll now receive helpful hydration reminders throughout the day.'
-                        );
-                    }, 1000);
-                } else if (permission === 'denied') {
-                    this.userData.notificationsEnabled = false;
-                    this.saveUserData();
-                    this.showNotification('Notifications blocked. You can enable them in browser settings for hydration reminders.', 'info');
-                }
-            } catch (error) {
-                console.error('Error requesting notification permission:', error);
+    initTipCarousel() {
+        const update = () => {
+            const t = this.healthTips[Math.floor(Math.random() * this.healthTips.length)];
+            const ic = document.getElementById('tipIcon'), tx = document.getElementById('tipText'), vi = document.getElementById('tipVisual'), tl = document.getElementById('tipLabel');
+            if (ic) ic.textContent = t.icon; if (tx) tx.textContent = t.text;
+            if (tl) tl.textContent = t.cat;
+            if (vi) {
+                const colors = ['#00ffff', '#ff00ff', '#00ffaa', '#ffaa00', '#0088ff'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                vi.style.background = `radial-gradient(circle at 70% 30%, ${color}33, transparent), linear-gradient(135deg, ${color}11, transparent)`;
+                vi.innerHTML = `<span class="visual-symbol" style="color:${color}aa">${t.icon}</span>`;
             }
-        } else {
-            this.showNotification('Your browser doesn\'t support notifications.', 'info');
-        }
-    }
+        };
 
-    sendNotification(title, body) {
-        if (this.notificationPermission === 'granted' && this.userData.notificationsEnabled) {
-            try {
-                const notification = new Notification(title, {
-                    body: body,
-                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%2300ffff"/><text x="50" y="65" text-anchor="middle" font-size="40" fill="white">💧</text></svg>',
-                    badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💧</text></svg>',
-                    tag: 'hydration-reminder',
-                    requireInteraction: false,
-                    silent: false,
-                    timestamp: Date.now(),
-                    data: {
-                        url: window.location.origin,
-                        action: 'hydrate'
-                    }
-                });
-
-                notification.onclick = () => {
-                    window.focus();
-                    notification.close();
-                };
-
-                // Auto-close after 8 seconds for better mobile experience
-                setTimeout(() => {
-                    if (notification) {
-                        notification.close();
-                    }
-                }, 8000);
-
-                // Enhanced vibration pattern for mobile
-                if ('vibrate' in navigator) {
-                    navigator.vibrate([200, 100, 200]);
-                }
-            } catch (error) {
-                console.error('Error sending notification:', error);
-            }
-        }
-    }
-
-    startReminderSystem() {
-        // Clear existing interval
-        if (this.reminderInterval) {
-            clearInterval(this.reminderInterval);
-        }
-
-        // Set up reminder every 1.5 hours for more frequent reminders
-        this.reminderInterval = setInterval(() => {
-            this.checkAndSendReminder();
-        }, 5400000); // 1.5 hours
-
-        // Also check every 30 minutes for more responsive reminders
-        this.frequentReminderInterval = setInterval(() => {
-            this.checkAndSendFrequentReminder();
-        }, 1800000); // 30 minutes
-
-        // Send initial reminder after 30 minutes if no water drunk
-        setTimeout(() => {
-            this.checkAndSendInitialReminder();
-        }, 1800000);
-    }
-
-    checkAndSendReminder() {
-        const now = new Date();
-        const hours = now.getHours();
-        
-        // Only send reminders during waking hours (7 AM - 10 PM)
-        if (hours >= 7 && hours <= 22 && this.userData.notificationsEnabled) {
-            const progress = this.userData.glassesDrankToday;
-            const goal = this.userData.dailyGoal;
-            
-            if (progress < goal) {
-                const remaining = goal - progress;
-                const userName = this.userData.userName || 'Friend';
-                
-                if (progress === 0) {
-                    this.sendNotification(
-                        `Hey ${userName}! 💧`,
-                        "Time for your first glass of water today! Sip some water and slay the day 💧🔥"
-                    );
-                } else {
-                    const messages = [
-                        `You need ${remaining} more glasses to reach your goal. Keep it up! 🌊`,
-                        `Hydration check! ${remaining} glasses to go, you've got this! 💪`,
-                        `Time for some H2O magic! ${remaining} more glasses needed 💧`,
-                        `Your body is calling for water! ${remaining} glasses remaining 🚰`
-                    ];
-                    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-                    
-                    this.sendNotification(
-                        `Hydration Reminder 💧`,
-                        randomMessage
-                    );
-                }
-            }
-        }
-    }
-
-    checkAndSendFrequentReminder() {
-        const now = new Date();
-        const hours = now.getHours();
-        const lastDrinkTime = localStorage.getItem('lastDrinkTime');
-        const currentTime = now.getTime();
-        
-        // Send reminder if it's been more than 2 hours since last drink
-        if (hours >= 8 && hours <= 21 && this.userData.notificationsEnabled) {
-            if (lastDrinkTime) {
-                const timeSinceLastDrink = currentTime - parseInt(lastDrinkTime);
-                const twoHours = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
-                
-                if (timeSinceLastDrink > twoHours && this.userData.glassesDrankToday < this.userData.dailyGoal) {
-                    const userName = this.userData.userName || 'Friend';
-                    this.sendNotification(
-                        `${userName}, time to hydrate! 💧`,
-                        "It's been a while since your last glass. Your body needs water! 🌊"
-                    );
-                }
-            }
-        }
-    }
-
-    checkAndSendInitialReminder() {
-        if (this.userData.glassesDrankToday === 0 && this.userData.notificationsEnabled) {
-            const now = new Date();
-            const hours = now.getHours();
-            
-            if (hours >= 8 && hours <= 21) {
-                const userName = this.userData.userName || 'Friend';
-                this.sendNotification(
-                    `Good morning ${userName}! ☀️`,
-                    "Start your day right with a refreshing glass of water! 💧"
-                );
-            }
-        }
-    }
-
-    testNotification() {
-        if (this.notificationPermission !== 'granted') {
-            this.requestNotificationPermission().then(() => {
-                if (this.notificationPermission === 'granted') {
-                    this.sendTestNotification();
-                }
-            });
-        } else {
-            this.sendTestNotification();
-        }
-    }
-
-    checkNotificationPrompt() {
-        if (this.userData.userName && !this.userData.notificationsEnabled && 
-            Notification.permission === 'default') {
-            this.showNotification(
-                'Enable notifications to get helpful hydration reminders throughout the day!', 
-                'info'
-            );
-        }
-    }
-
-    sendTestNotification() {
-        const userName = this.userData.userName || 'Friend';
-        this.sendNotification(
-            `Hey ${userName}! 💧`,
-            "This is a test notification! Your hydration reminders are working perfectly."
-        );
-        this.showNotification('Test notification sent! Check your device notifications.', 'success');
-    }
-
-    resetAllData() {
-        if (confirm('Are you sure you want to reset all your data? This action cannot be undone.')) {
-            localStorage.removeItem('hydrationData');
-            localStorage.removeItem('lastDrinkTime');
-            localStorage.removeItem('hydrationHistory');
-            location.reload();
-        }
-    }
-
-    // Add method to get historical data for potential future features
-    getHistoricalData() {
-        try {
-            return JSON.parse(localStorage.getItem('hydrationHistory')) || {};
-        } catch (error) {
-            console.error('Error loading historical data:', error);
-            return {};
-        }
+        // Handle manual next button
+        let nx = document.getElementById('tipNextBtn');
+        if (nx) nx.onclick = () => {
+            clearInterval(this.tipInterval);
+            update();
+            this.tipInterval = setInterval(update, 8000);
+        };
+        // Setup automatic interval
+        if (this.tipInterval) clearInterval(this.tipInterval);
+        this.tipInterval = setInterval(update, 8000);
     }
 }
 
-// CSS for confetti animation
-const confettiStyle = document.createElement('style');
-confettiStyle.textContent = `
-    @keyframes confettiFall {
-        0% {
-            transform: translateY(-10px) rotate(0deg);
-            opacity: 1;
-        }
-        100% {
-            transform: translateY(100vh) rotate(360deg);
-            opacity: 0;
-        }
-    }
-    
-    .celebrating .neon-btn {
-        animation: celebrateButton 0.6s ease-in-out 3;
-    }
-    
-    @keyframes celebrateButton {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.1); }
-    }
-`;
-document.head.appendChild(confettiStyle);
-
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new HydrationTracker();
-});
-
-// Service Worker registration for better performance
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        const swData = `
-            const CACHE_NAME = 'aquaflow-v1';
-            const urlsToCache = [
-                '/',
-                '/style.css',
-                '/script.js'
-            ];
-
-            self.addEventListener('install', event => {
-                event.waitUntil(
-                    caches.open(CACHE_NAME)
-                        .then(cache => cache.addAll(urlsToCache))
-                );
-            });
-
-            self.addEventListener('fetch', event => {
-                event.respondWith(
-                    caches.match(event.request)
-                        .then(response => {
-                            if (response) {
-                                return response;
-                            }
-                            return fetch(event.request);
-                        }
-                    )
-                );
-            });
-        `;
-        
-        const blob = new Blob([swData], { type: 'application/javascript' });
-        const swUrl = URL.createObjectURL(blob);
-        
-        navigator.serviceWorker.register(swUrl)
-            .then(registration => {
-                console.log('SW registered: ', registration);
-            })
-            .catch(registrationError => {
-                console.log('SW registration failed: ', registrationError);
-            });
-    });
-}
+document.addEventListener('DOMContentLoaded', () => window.aquaFlow = new AquaFlow());

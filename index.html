@@ -2,268 +2,666 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AquaFlow - Hydration Tracker</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQXF1YUZsb3ciLCJzaG9ydF9uYW1lIjoiQXF1YUZsb3ciLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBkMGQyMyIsInRoZW1lX2NvbG9yIjoiIzAwZmZmZiJ9">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Aqua Flow — Hydration Tracker</title>
+
+    <!-- SEO -->
+    <meta name="description" content="Aqua Flow — Your smart hydration companion. Track daily water intake, earn XP, unlock achievements and get intelligent reminders. Stay hydrated, stay legendary.">
+    <meta name="keywords" content="water tracker, hydration reminder, drink water, health app, aqua flow, water intake">
+    <meta name="author" content="Aqua Flow">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="Aqua Flow — Hydration Tracker">
+    <meta property="og:description" content="Stay hydrated with smart reminders, streaks and gamified achievements.">
+    <meta property="og:type" content="website">
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#00ffff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Aqua Flow">
+    <meta name="application-name" content="Aqua Flow">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='22' fill='%230d0d23'/><text x='90' y='125' text-anchor='middle' font-size='110'>💧</text></svg>">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Navigation -->
-        <nav class="nav-bar">
-            <div class="nav-brand">
-                <span class="logo">💧</span>
-                <span class="brand-text">AquaFlow</span>
+
+
+
+        <!-- ======== NOTIFICATION PERMISSION MODAL ======== -->
+        <div id="notif-perm-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="notifPermTitle">
+            <div class="modal-card glass-card">
+                <div class="modal-icon notif-icon-anim">🔔</div>
+                <h2 id="notifPermTitle">Enable Smart Reminders</h2>
+                <p>Aqua Flow will send you timely water reminders, streak alerts and health tips — even when the app is closed.</p>
+                <div class="modal-features">
+                    <div class="modal-feature">⏰ Hourly drink reminders</div>
+                    <div class="modal-feature">🔥 Streak milestone alerts</div>
+                    <div class="modal-feature">☀️ Warm water morning tips</div>
+                    <div class="modal-feature">🏆 Achievement unlocks</div>
+                </div>
+                <button id="notif-enable-btn" class="neon-btn primary full-width-btn"><span>Enable Reminders</span><div class="btn-glow"></div></button>
+                <button id="notif-later-btn" class="ghost-btn">Maybe Later</button>
             </div>
-            <div class="nav-links">
-                <button class="nav-btn" data-page="home">Home</button>
-                <button class="nav-btn" data-page="tracker">Tracker</button>
-                <button class="nav-btn" data-page="stats">Stats</button>
-                <button class="nav-btn" data-page="about">About</button>
+        </div>
+
+        <!-- ======== LEVEL UP OVERLAY ======== -->
+        <div id="level-up-overlay" class="modal-overlay hidden" role="alertdialog" aria-modal="true">
+            <div class="modal-card glass-card level-up-card">
+                <div class="level-up-stars">✨✨✨</div>
+                <div class="level-up-emoji" id="levelUpEmoji">🌊</div>
+                <div class="level-up-label">LEVEL UP!</div>
+                <div class="level-up-name" id="levelUpName">Water Warrior</div>
+                <p class="level-up-msg" id="levelUpMsg">You're on fire! Keep sipping!</p>
+                <button class="neon-btn primary full-width-btn" id="levelUpClose"><span>Let's Go! 🚀</span><div class="btn-glow"></div></button>
+            </div>
+        </div>
+
+        <!-- ======== ACHIEVEMENT TOAST (custom) ======== -->
+        <div id="achievement-toast" class="achievement-toast hidden" role="alert" aria-live="assertive">
+            <div class="ach-toast-inner">
+                <span class="ach-toast-icon" id="achToastIcon">🏆</span>
+                <div class="ach-toast-text">
+                    <strong id="achToastTitle">Achievement Unlocked!</strong>
+                    <span id="achToastDesc">First Drop</span>
+                </div>
+                <span class="ach-toast-xp" id="achToastXP">+10 XP</span>
+            </div>
+        </div>
+
+        <!-- ======== NAVIGATION ======== -->
+        <nav class="nav-bar" role="navigation" aria-label="Main Navigation">
+            <div class="nav-brand">
+                <span class="nav-logo" aria-hidden="true">💧</span>
+                <span class="nav-brand-name">Aqua Flow</span>
+            </div>
+            <div class="nav-links" role="tablist">
+                <button class="nav-btn active" data-page="home"    id="nav-home"    role="tab" aria-selected="true"  aria-controls="home-page">Home</button>
+                <button class="nav-btn"        data-page="tracker" id="nav-tracker" role="tab" aria-selected="false" aria-controls="tracker-page">Tracker</button>
+                <button class="nav-btn"        data-page="stats"   id="nav-stats"   role="tab" aria-selected="false" aria-controls="stats-page">Stats</button>
+                <button class="nav-btn"        data-page="about"   id="nav-about"   role="tab" aria-selected="false" aria-controls="about-page">Settings</button>
             </div>
         </nav>
 
-        <!-- Home Page -->
-        <div id="home-page" class="page active">
-            <div class="hero-section">
-                <div class="floating-elements">
-                    <div class="floating-drop drop-1">💧</div>
-                    <div class="floating-drop drop-2">🌊</div>
-                    <div class="floating-drop drop-3">💎</div>
-                </div>
-                
-                <div class="hero-content">
-                    <h1 class="hero-title">
-                        <span class="gradient-text">AquaFlow</span>
-                        <div class="subtitle">Stay Hydrated, Stay Legendary</div>
-                    </h1>
-                    
-                    <div class="welcome-card glass-card" id="welcome-section">
-                        <div class="card-content">
-                            <div class="avatar-section">
-                                <div class="avatar">🧑‍💼</div>
-                            </div>
-                            <h2>Welcome to Your Hydration Journey</h2>
-                            <p>Enter your name to begin your aquatic adventure</p>
-                            <div class="input-group">
-                                <input type="text" id="userName" placeholder="Your name..." class="neon-input">
-                                <button id="startJourney" class="neon-btn primary">
-                                    <span>Start Journey</span>
-                                    <div class="btn-glow"></div>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+        <!-- ======================================================
+             HOME PAGE
+        ====================================================== -->
+        <div id="home-page" class="page active" role="tabpanel" aria-labelledby="nav-home">
 
-                    <div class="welcome-back-card glass-card hidden" id="welcome-back-section">
-                        <div class="card-content">
-                            <h2>Welcome Back, <span id="userNameDisplay"></span>! 🌊</h2>
-                            <p class="status-text" id="hydrationStatus"></p>
-                            <button class="neon-btn primary" data-page="tracker">
-                                <span>Continue Hydrating</span>
-                                <div class="btn-glow"></div>
-                            </button>
-                        </div>
+            <!-- ── HERO ── -->
+            <div class="home-hero" aria-hidden="true">
+                <div class="hero-drops">
+                    <span class="fdrop fdrop-1">💧</span>
+                    <span class="fdrop fdrop-2">🌊</span>
+                    <span class="fdrop fdrop-3">💎</span>
+                    <span class="fdrop fdrop-4">❄️</span>
+                </div>
+                <h1 class="hero-brand">
+                    <span class="gradient-text">Aqua Flow</span>
+                    <span class="hero-tagline">Stay Hydrated, Stay Legendary</span>
+                </h1>
+            </div>
+
+            <!-- ── NEW USER ONBOARDING ── -->
+            <div class="hero-card glass-card onboarding-card" id="welcome-section">
+                <div class="onboarding-liquid" id="onboardingLiquid"></div>
+                <div class="avatar-wrap">
+                    <div class="avatar-circle pulse-avatar" aria-hidden="true" id="onboardingAvatar">💧</div>
+                </div>
+                <h2 class="bubbling-text">Begin Your Journey</h2>
+                <p class="hero-card-sub">What shall we call you, Hydro Hero?</p>
+                <div class="name-input-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input type="text" id="userName" placeholder="Your name..." class="neon-input splash-input"
+                               autocomplete="given-name" aria-label="Your name" maxlength="24" spellcheck="false">
                     </div>
+                    <button id="startJourney" class="neon-btn primary start-btn loading-off">
+                        <span>Dive In 🌊</span>
+                        <div class="btn-glow"></div>
+                    </button>
+                </div>
+                <div class="home-perks">
+                    <span class="perk">⚡ XP</span>
+                    <span class="perk">🔥 Streaks</span>
+                    <span class="perk">⏰ Alarms</span>
+                    <span class="perk">🏆 Levels</span>
+                </div>
+                <div class="onboarding-progress">
+                    <div class="op-bar" id="onboardingBar"></div>
                 </div>
             </div>
-        </div>
 
-        <!-- Tracker Page -->
-        <div id="tracker-page" class="page">
-            <div class="tracker-section">
-                <div class="hydration-header">
-                    <h1>Hydration Central</h1>
-                    <div class="daily-goal">
-                        <span id="currentGlasses">0</span> / <span id="dailyGoal">8</span> glasses
+            <!-- ── RETURNING USER DASHBOARD ── -->
+            <div class="hidden" id="welcome-back-section">
+
+                <!-- Greeting bar -->
+                <div id="greetingBar" class="wb-greeting-card glass-card time-context-bg">
+                    <div id="comboBadge" class="combo-badge hidden">1x Combo! 🔥</div>
+                    <div class="wb-top-row">
+                        <div class="wb-avatar-wrap">
+                            <div class="wb-avatar" id="wbLevelBadge" aria-hidden="true">💧</div>
+                            <div class="avatar-ripple"></div>
+                        </div>
+                        <div class="wb-text">
+                            <h2 class="greeting-text"><span id="timeOfDayMsg">Good Morning</span>, <span id="userNameDisplay"></span>! 👋</h2>
+                            <p id="hydrationStatus" class="wb-status">Looking hydrated today!</p>
+                        </div>
+                        <div class="wb-clock-wrap">
+                            <div class="wb-time-badge" id="wbDigitalClock">00:00</div>
+                            <div class="wb-day-badge" id="wbDayBadge">Mon, 01 Jan</div>
+                        </div>
+                    </div>
+
+                    <!-- Stats row -->
+                    <div class="home-stats-row">
+                        <div class="hs-card">
+                            <div class="hs-val" id="homeTodayGlasses">0</div>
+                            <div class="hs-lbl">Today<br><small id="homeTodayGoal">/8</small></div>
+                        </div>
+                        <div class="hs-card hs-highlight">
+                            <div class="hs-val" id="homeStreak">0</div>
+                            <div class="hs-lbl">🔥 Streak<br><small>days</small></div>
+                        </div>
+                        <div class="hs-card">
+                            <div class="hs-val" id="homeXP">0</div>
+                            <div class="hs-lbl">⭐ XP<br><small>earned</small></div>
+                        </div>
+                    </div>
+
+                    <!-- Mini progress -->
+                    <div class="home-progress-wrap">
+                        <div class="home-progress-track" role="progressbar" aria-label="Today's progress">
+                            <div class="home-progress-fill" id="homeProgressFill"></div>
+                        </div>
+                        <span class="home-progress-pct" id="homeProgressPct">0%</span>
+                    </div>
+
+                    <!-- Level-up mini-bar -->
+                    <div class="level-mini-bar-wrap">
+                        <span class="lmb-label" id="lvlMiniName">Level 1</span>
+                        <div class="lmb-track">
+                            <div class="lmb-fill" id="lvlMiniFill"></div>
+                        </div>
+                        <span class="lmb-xp" id="lvlMiniXP">0 XP</span>
+                    </div>
+
+                    <!-- CTAs -->
+                    <div class="wb-cta-row">
+                        <button class="drink-water-home-btn neon-btn primary" data-page="tracker" id="continue-btn">
+                            <span>💧 Drink Water</span>
+                            <div class="btn-glow"></div>
+                        </button>
+                        <button class="outline-btn" data-page="stats">
+                            <span>📊 My Stats</span>
+                        </button>
                     </div>
                 </div>
 
-                <div class="progress-section">
-                    <div class="progress-container">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressFill"></div>
-                            <div class="progress-wave"></div>
-                        </div>
-                        <div class="progress-text" id="progressText">0%</div>
+
+
+
+                <!-- ── HEALTH TIPS CAROUSEL ── -->
+                <div class="tips-section">
+                    <div class="tips-header">
+                        <span class="tips-label">💡 Health Tips</span>
+                        <button class="tips-next-btn" id="tipNextBtn" aria-label="Next tip">›</button>
                     </div>
+                <div class="tip-card glass-card" id="tipCard">
+                    <div class="tip-visual" id="tipVisual" style="background: radial-gradient(circle at 70% 30%, #00ffff33, transparent), linear-gradient(135deg, #00ffff11, transparent);">
+                        <span class="visual-symbol" style="color:#00ffffaa">🧠</span>
+                    </div>
+                    <div class="tip-header-row">
+                        <span class="tip-label-pill" id="tipLabel">COGNITIVE</span>
+                        <div class="tip-icon-mini" id="tipIcon">🧠</div>
+                    </div>
+                    <p class="tip-text" id="tipText">Your brain is 73% water. Even minor dehydration can shrink brain tissue, leading to fatigue, mood swings, and impaired short-term memory. Keep sipping to stay sharp!</p>
+                    <div class="tip-dots" id="tipDots"></div>
+                </div>
                 </div>
 
-                <div class="hydration-action">
-                    <div class="glass-container">
-                        <div class="water-glass" id="waterGlass">
-                            <div class="water-fill" id="waterFill"></div>
-                            <div class="glass-shine"></div>
+                <!-- ── DRINK WATER CTA SECTION ── -->
+                <div class="home-track-cta glass-card" id="homeTrackCta">
+                    <div class="htc-top">
+                        <div class="htc-emoji">🥤</div>
+                        <div>
+                            <div class="htc-title">Ready for a sip?</div>
+                            <div class="htc-sub" id="htcSubtext">Every glass counts toward your goal!</div>
                         </div>
                     </div>
-                    
-                    <button class="drink-btn" id="drinkBtn">
-                        <span>Drink Water</span>
-                        <div class="ripple"></div>
+                    <button class="neon-btn primary htc-btn" data-page="tracker">
+                        <span>💧 Drink Water Now</span>
+                        <div class="btn-glow"></div>
                     </button>
                 </div>
 
-                <div class="fun-facts-section">
-                    <div class="fact-card glass-card">
-                        <h3>💡 Hydration Wisdom</h3>
-                        <p id="funFact" class="fact-text"></p>
+                <!-- ── BENEFITS GRID ── -->
+                <div class="benefits-section">
+                    <h3 class="benefits-title">Why Hydrate? 🔬</h3>
+                    <div class="benefits-grid">
+                        <div class="benefit-card glass-card">
+                            <div class="bc-icon">🧠</div>
+                            <div class="bc-title">Brain Power</div>
+                            <div class="bc-desc">Increases focus and cognitive function.</div>
+                        </div>
+                        <div class="benefit-card glass-card">
+                            <div class="bc-icon">⚡</div>
+                            <div class="bc-title">Energy Boost</div>
+                            <div class="bc-desc">Fights fatigue and keeps you energized.</div>
+                        </div>
+                        <div class="benefit-card glass-card">
+                            <div class="bc-icon">✨</div>
+                            <div class="bc-title">Skin Health</div>
+                            <div class="bc-desc">Maintains elasticity and natural glow.</div>
+                        </div>
+                        <div class="benefit-card glass-card">
+                            <div class="bc-icon">🔥</div>
+                            <div class="bc-title">Metabolism</div>
+                            <div class="bc-desc">Aids in weight management and digestion.</div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="quick-stats">
-                    <div class="stat-item glass-card">
-                        <div class="stat-icon">🔥</div>
-                        <div class="stat-label">Current Streak</div>
-                        <div class="stat-value" id="currentStreak">0</div>
+
+
+            </div><!-- /#welcome-back-section -->
+        </div>
+
+        <!-- ======================================================
+             TRACKER PAGE
+        ====================================================== -->
+        <div id="tracker-page" class="page" role="tabpanel" aria-labelledby="nav-tracker">
+            <div class="tracker-section">
+
+                <!-- Header -->
+                <div class="tracker-header">
+                    <h1 class="tracker-title">Hydration Central</h1>
+                    <div class="tracker-count-wrap">
+                        <span class="tracker-count" id="currentGlasses">0</span>
+                        <span class="tracker-count-sep">/</span>
+                        <span class="tracker-goal" id="dailyGoal">8</span>
+                        <span class="tracker-unit">glasses</span>
                     </div>
-                    <div class="stat-item glass-card">
-                        <div class="stat-icon">🏆</div>
-                        <div class="stat-label">Level</div>
-                        <div class="stat-value" id="currentLevel">Thirsty Noob</div>
+                </div>
+
+                <!-- Progress -->
+                <div class="progress-section">
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Daily hydration progress" id="progressBarTrack">
+                            <div class="progress-bar-fill" id="progressFill"></div>
+                            <div class="progress-bar-shine" aria-hidden="true"></div>
+                        </div>
+                        <div class="progress-pct" id="progressText">0%</div>
                     </div>
+                </div>
+
+                <!-- Water type badge (contextual) -->
+                <div class="water-tip-badge glass-card" id="waterTipBadge">
+                    <span class="wtb-icon" id="waterTipIcon">💧</span>
+                    <span class="wtb-text" id="waterTipText">Loading your water tip...</span>
+                </div>
+
+                <!-- Drink Button Section -->
+                <div class="drink-section">
+                    <!-- Drink Size Selector -->
+                    <div class="drink-size-selector" role="radiogroup" aria-label="Select drink size">
+                        <button class="size-btn" data-ml="100" aria-label="Small Sip (100ml)">
+                            <span class="size-icon">💧</span>
+                            <span class="size-label">Sip</span>
+                            <span class="size-amt">100ml</span>
+                        </button>
+                        <button class="size-btn active" data-ml="250" aria-label="Standard Glass (250ml)">
+                            <span class="size-icon">🥤</span>
+                            <span class="size-label">Glass</span>
+                            <span class="size-amt">250ml</span>
+                        </button>
+                        <button class="size-btn" data-ml="500" aria-label="Large Bottle (500ml)">
+                            <span class="size-icon">🍼</span>
+                            <span class="size-label">Bottle</span>
+                            <span class="size-amt">500ml</span>
+                        </button>
+                    </div>
+
+                    <div class="glass-wrap" aria-hidden="true">
+                        <div class="water-glass" id="waterGlass">
+                            <div class="water-fill" id="waterFill"></div>
+                            <div class="glass-bubble b1"></div>
+                            <div class="glass-bubble b2"></div>
+                            <div class="glass-shine"></div>
+                        </div>
+                        <div class="glass-label" id="glassLabel">Empty</div>
+                    </div>
+
+                    <button class="drink-btn" id="drinkBtn" aria-label="Drink current selected size">
+                        <div class="drink-btn-inner">
+                            <span class="drink-btn-icon" id="drinkBtnIcon">🥤</span>
+                            <span class="drink-btn-text">Drink Now</span>
+                        </div>
+                        <div class="drink-ripple" aria-hidden="true"></div>
+                        <div class="drink-pulse-ring" aria-hidden="true"></div>
+                    </button>
+                </div>
+
+                <!-- XP Bar -->
+                <div class="xp-section">
+                    <div class="xp-row">
+                        <span class="xp-level-name" id="xpLevelName">💧 Thirsty Noob</span>
+                        <span class="xp-amount" id="xpAmount">0 XP</span>
+                    </div>
+                    <div class="xp-track">
+                        <div class="xp-fill" id="xpFill"></div>
+                    </div>
+                    <div class="xp-next" id="xpNext">Earn 50 XP to level up</div>
+                </div>
+
+                <!-- Hydration Wisdom -->
+                <div class="wisdom-card glass-card">
+                    <div class="wisdom-header">💡 Hydration Wisdom</div>
+                    <p class="wisdom-text" id="funFact"></p>
+                </div>
+
+                <!-- Quick Stats Row -->
+                <div class="quick-stats-row">
+                    <div class="qs-card glass-card">
+                        <div class="qs-icon">🔥</div>
+                        <div class="qs-val" id="currentStreak">0</div>
+                        <div class="qs-lbl">Day Streak</div>
+                    </div>
+                    <div class="qs-card glass-card">
+                        <div class="qs-icon">🏆</div>
+                        <div class="qs-val qs-level" id="currentLevel">Noob</div>
+                        <div class="qs-lbl">Level</div>
+                    </div>
+                    <div class="qs-card glass-card">
+                        <div class="qs-icon">⭐</div>
+                        <div class="qs-val" id="trackerXP">0</div>
+                        <div class="qs-lbl">Total XP</div>
+                    </div>
+                </div>
+
+                <!-- Combo Multiplier -->
+                <div class="combo-banner glass-card hidden" id="comboBanner">
+                    <span class="combo-icon">⚡</span>
+                    <span class="combo-text">Combo x<span id="comboCount">2</span>! XP Multiplied! Keep drinking! 💪</span>
                 </div>
             </div>
         </div>
 
-        <!-- Stats Page -->
-        <div id="stats-page" class="page">
+        <!-- ======================================================
+             STATS PAGE
+        ====================================================== -->
+        <div id="stats-page" class="page" role="tabpanel" aria-labelledby="nav-stats">
             <div class="stats-section">
-                <h1>Your Hydration Stats</h1>
-                
+                <h1 class="page-title">Your Hydration Stats</h1>
+
                 <div class="stats-grid">
                     <div class="stat-card glass-card">
-                        <div class="stat-header">
-                            <div class="stat-icon-large">💧</div>
-                            <h3>Total Glasses</h3>
-                        </div>
-                        <div class="stat-number" id="totalGlassesCount">0</div>
+                        <div class="sc-icon">💧</div>
+                        <div class="sc-label">Total Glasses</div>
+                        <div class="sc-num" id="totalGlassesCount">0</div>
                     </div>
-
                     <div class="stat-card glass-card">
-                        <div class="stat-header">
-                            <div class="stat-icon-large">🔥</div>
-                            <h3>Best Streak</h3>
-                        </div>
-                        <div class="stat-number" id="bestStreak">0</div>
-                        <div class="stat-unit">days</div>
+                        <div class="sc-icon">🔥</div>
+                        <div class="sc-label">Best Streak</div>
+                        <div class="sc-num" id="bestStreak">0</div>
+                        <div class="sc-unit">days</div>
                     </div>
-
                     <div class="stat-card glass-card">
-                        <div class="stat-header">
-                            <div class="stat-icon-large">🏆</div>
-                            <h3>Current Level</h3>
+                        <div class="sc-icon">⭐</div>
+                        <div class="sc-label">Total XP</div>
+                        <div class="sc-num" id="totalXPCount">0</div>
+                        <div class="sc-unit">points</div>
+                    </div>
+                    <div class="stat-card glass-card today-card">
+                        <div class="sc-icon">📅</div>
+                        <div class="sc-label">Today</div>
+                        <div class="circular-progress-wrap">
+                            <svg class="circ-svg" viewBox="0 0 120 120" width="110" height="110" aria-hidden="true">
+                                <circle cx="60" cy="60" r="50" stroke="rgba(255,255,255,0.08)" stroke-width="9" fill="none"/>
+                                <circle cx="60" cy="60" r="50" stroke="url(#cGrad)" stroke-width="9" fill="none"
+                                        stroke-dasharray="314" stroke-dashoffset="314" id="todayCircle"
+                                        stroke-linecap="round"/>
+                                <defs>
+                                    <linearGradient id="cGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#00ffff"/>
+                                        <stop offset="100%" style="stop-color:#ff00ff"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <div class="circ-pct" id="todayPercent">0%</div>
                         </div>
-                        <div class="level-display">
-                            <div class="level-name" id="levelName">Thirsty Noob</div>
-                            <div class="level-progress">
-                                <div class="level-bar">
-                                    <div class="level-fill" id="levelFill"></div>
-                                </div>
-                                <div class="level-text" id="levelProgress">0/10</div>
+                    </div>
+                    <div class="stat-card glass-card level-stat-card">
+                        <div class="sc-icon">🏆</div>
+                        <div class="sc-label">Current Level</div>
+                        <div class="level-stat-name" id="levelName">💧 Thirsty Noob</div>
+                        <div class="level-progress-wrap">
+                            <div class="level-track">
+                                <div class="level-fill" id="levelFill"></div>
                             </div>
+                            <span class="level-xp-text" id="levelProgress">0/50 XP</span>
                         </div>
                     </div>
-
-                    <div class="stat-card glass-card">
-                        <div class="stat-header">
-                            <div class="stat-icon-large">📅</div>
-                            <h3>Today's Progress</h3>
-                        </div>
-                        <div class="today-progress">
-                            <div class="circular-progress">
-                                <svg class="progress-circle" width="120" height="120">
-                                    <circle cx="60" cy="60" r="50" stroke="#333" stroke-width="8" fill="none"/>
-                                    <circle cx="60" cy="60" r="50" stroke="url(#gradient)" stroke-width="8" fill="none" 
-                                            stroke-dasharray="314" stroke-dashoffset="314" id="todayCircle"/>
-                                    <defs>
-                                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" style="stop-color:#00ffff"/>
-                                            <stop offset="100%" style="stop-color:#ff00ff"/>
-                                        </linearGradient>
-                                    </defs>
-                                </svg>
-                                <div class="progress-number" id="todayPercent">0%</div>
-                            </div>
-                        </div>
+                    <div class="stat-card glass-card weekly-card">
+                        <div class="sc-icon">📆</div>
+                        <div class="sc-label">Last 7 Days</div>
+                        <div class="weekly-bars" id="weeklyHeatmap"></div>
                     </div>
                 </div>
 
+
+
+                <!-- Achievements -->
                 <div class="achievements-section">
-                    <h2>Achievements</h2>
-                    <div class="achievements-grid" id="achievementsGrid">
-                        <!-- Achievements will be dynamically generated -->
-                    </div>
+                    <h2 class="section-title">🏆 Achievements</h2>
+                    <div class="achievements-grid" id="achievementsGrid" role="list"></div>
                 </div>
             </div>
         </div>
 
-        <!-- About Page -->
-        <div id="about-page" class="page">
-            <div class="about-section">
-                <h1>About AquaFlow</h1>
-                
-                <div class="about-content">
-                    <div class="about-card glass-card">
-                        <h2>💧 Your Hydration Companion</h2>
-                        <p>AquaFlow is designed to make staying hydrated fun and engaging. Through gamification, beautiful design, and smart reminders, we help you build healthy hydration habits that last.</p>
+        <!-- ======================================================
+             SETTINGS PAGE
+        ====================================================== -->
+        <div id="about-page" class="page" role="tabpanel" aria-labelledby="nav-about">
+            <div class="settings-section">
+                <h1 class="page-title">Settings</h1>
+
+                <div class="settings-group glass-card">
+                    <h3 class="settings-group-title">💧 Daily Goal</h3>
+                    <div class="goal-stepper">
+                        <button class="stepper-btn" id="goalDown" aria-label="Decrease goal">−</button>
+                        <div class="goal-display">
+                            <span id="goalDisplayVal" class="goal-val">8</span>
+                            <span class="goal-unit">glasses / day</span>
+                        </div>
+                        <button class="stepper-btn" id="goalUp" aria-label="Increase goal">+</button>
                     </div>
+                </div>
 
-                    <div class="about-card glass-card">
-                        <h2>🎮 Gamified Experience</h2>
-                        <p>Level up from "Thirsty Noob" to "Aqua God" as you maintain your hydration streaks. Earn achievements, track your progress, and compete with your past self.</p>
+                <div class="settings-group glass-card">
+                    <h3 class="settings-group-title">⏰ Reminder Interval</h3>
+                    <div class="interval-options" id="intervalOptions">
+                        <button class="interval-chip" data-mins="30">30 min</button>
+                        <button class="interval-chip" data-mins="60">1 hr</button>
+                        <button class="interval-chip active" data-mins="90">1.5 hr</button>
+                        <button class="interval-chip" data-mins="120">2 hr</button>
                     </div>
+                </div>
 
-                    <div class="about-card glass-card">
-                        <h2>🔔 Smart Notifications</h2>
-                        <p>Receive personalized hydration reminders that adapt to your schedule and preferences. Stay on track without being overwhelmed.</p>
+                <div class="settings-group glass-card">
+                    <h3 class="settings-group-title">💤 Sleep Mode (DND)</h3>
+                    <p class="settings-hint">Reminders will pause during these hours</p>
+                    <div class="notif-toggle-row">
+                        <label class="toggle-label-text" for="sleepModeToggle">Enable Quiet Hours</label>
+                        <div class="toggle-wrap">
+                            <input type="checkbox" id="sleepModeToggle" class="toggle-check">
+                            <label for="sleepModeToggle" class="toggle-slider"></label>
+                        </div>
                     </div>
-
-                    <div class="settings-section">
-                        <h2>Settings</h2>
-                        <div class="settings-card glass-card">
-                            <div class="setting-item">
-                                <label for="dailyGoalInput">Daily Goal (glasses):</label>
-                                <input type="number" id="dailyGoalInput" min="6" max="12" value="8" class="neon-input">
-                            </div>
-                            
-                            <div class="setting-item">
-                                <label for="notificationsToggle">Push Notifications:</label>
-                                <div class="toggle-switch">
-                                    <input type="checkbox" id="notificationsToggle" class="toggle-input">
-                                    <label for="notificationsToggle" class="toggle-label"></label>
-                                </div>
-                            </div>
-                            
-                            <div class="setting-item">
-                                <button id="testNotificationBtn" class="neon-btn">
-                                    <span>Test Notification</span>
-                                    <div class="btn-glow"></div>
-                                </button>
-                            </div>
-
-                            <button id="resetDataBtn" class="neon-btn danger">
-                                <span>Reset All Data</span>
-                                <div class="btn-glow"></div>
-                            </button>
+                    <div class="sleep-hours-row" id="sleepHoursSection">
+                        <div class="time-input-wrap">
+                            <label>Start (Bedtime)</label>
+                            <input type="time" id="sleepStart" class="neon-input time-input" value="22:00">
+                        </div>
+                        <div class="time-input-wrap">
+                            <label>End (Wakeup)</label>
+                            <input type="time" id="sleepEnd" class="neon-input time-input" value="07:00">
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Notification Popup -->
-        <div id="notification-popup" class="notification-popup hidden">
-            <div class="notification-content glass-card">
-                <div class="notification-icon">💧</div>
-                <div class="notification-text">
-                    <h3>Great job!</h3>
-                    <p id="notification-message"></p>
+                <div class="settings-group glass-card">
+                    <h3 class="settings-group-title">🌡️ Weather Boost</h3>
+                    <div class="notif-toggle-row">
+                        <div class="toggle-label-group">
+                            <label class="toggle-label-text" for="heatwaveToggle">Heatwave Mode</label>
+                            <span class="settings-hint">Increases goal by 20% for hot days</span>
+                        </div>
+                        <div class="toggle-wrap">
+                            <input type="checkbox" id="heatwaveToggle" class="toggle-check">
+                            <label for="heatwaveToggle" class="toggle-slider"></label>
+                        </div>
+                    </div>
                 </div>
-                <button class="close-notification">✕</button>
+
+                <div class="settings-group glass-card">
+                    <h3 class="settings-group-title">⚖️ Smart Goal Recommendation</h3>
+                    <p class="settings-hint">Based on body metrics</p>
+                    <div class="goal-calc-row">
+                        <div class="input-wrapper">
+                            <span class="input-icon">⚖️</span>
+                            <input type="number" id="userWeight" placeholder="Weight (kg)" class="neon-input weight-input" min="30" max="250">
+                        </div>
+                        <select id="userActivity" class="neon-input activity-select">
+                            <option value="sedentary">Sedentary</option>
+                            <option value="moderate" selected>Moderate Activity</option>
+                            <option value="active">High Activity</option>
+                        </select>
+                    </div>
+                    <button class="outline-btn full-width-btn" style="margin-top: 15px;" id="calcGoalBtn">
+                        <span>Calculate Recommended Goal</span>
+                    </button>
+                    <div id="calcResult" class="calc-result hidden"> Recommended: <span id="recommendedGoal">--</span> glasses </div>
+                </div>
+
+                <div class="settings-group glass-card">
+                    <h3 class="settings-group-title">🔔 Notifications</h3>
+                    <div class="notif-toggle-row">
+                        <label class="toggle-label-text" for="notificationsToggle">Push Reminders</label>
+                        <div class="toggle-wrap">
+                            <input type="checkbox" id="notificationsToggle" class="toggle-check" aria-label="Enable push notifications">
+                            <label for="notificationsToggle" class="toggle-slider"></label>
+                        </div>
+                    </div>
+                    <div class="notif-toggle-row">
+                        <label class="toggle-label-text" for="soundToggle">Notification Sounds</label>
+                        <div class="toggle-wrap">
+                            <input type="checkbox" id="soundToggle" class="toggle-check" aria-label="Enable notification sounds" checked>
+                            <label for="soundToggle" class="toggle-slider"></label>
+                        </div>
+                    </div>
+                    <div class="sound-picker-row">
+                        <label for="toneSelect" class="settings-hint">Select Reminder Tone</label>
+                        <select id="toneSelect" class="neon-input tone-select">
+                            <option value="aqua">Aqua Drop (Default)</option>
+                            <option value="crystal">Crystal Clear</option>
+                            <option value="wave">Ocean Wave</option>
+                            <option value="zen">Zen Bowl</option>
+                            <option value="morning">Morning Breeze</option>
+                        </select>
+                    </div>
+                    <div class="notif-status" id="notifStatus"></div>
+                </div>
+
+                <div class="settings-group glass-card">
+                    <h3 class="settings-group-title">🧪 Test & Actions</h3>
+                    <div class="settings-actions">
+                        <button class="neon-btn" id="viewHistoryBtn"><span>📊 View Full History</span><div class="btn-glow"></div></button>
+                        <button class="neon-btn" id="testNotificationBtn"><span>🔔 Test Notification</span><div class="btn-glow"></div></button>
+                        <button class="neon-btn" id="testSoundBtn"><span>🔊 Test Sound</span><div class="btn-glow"></div></button>
+                        <button class="neon-btn danger" id="resetDataBtn"><span>🗑 Reset All Data</span><div class="btn-glow"></div></button>
+                    </div>
+                </div>
+
+                <div class="settings-group glass-card about-card">
+                    <h3 class="settings-group-title">ℹ️ About Aqua Flow</h3>
+                    <p>Your gamified hydration companion. Earn XP, hit streaks, unlock achievements and get smart reminders — even when the app is closed.</p>
+                    <div class="about-features">
+                        <div class="ab-feat">💧 Track daily water intake</div>
+                        <div class="ab-feat">⭐ XP &amp; Level progression</div>
+                        <div class="ab-feat">🔥 Streak tracking</div>
+                        <div class="ab-feat">🔔 Background notifications</div>
+                        <div class="ab-feat">☀️ Warm/cold water tips</div>
+                        <div class="ab-feat">📊 7-day history</div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <script src="script.js"></script>
+        <!-- ======== FULL HISTORY MODAL ======== -->
+        <div id="history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+            <div class="modal-card glass-card history-card">
+                <div class="modal-header">
+                    <h2>Your Hydration History 📊</h2>
+                    <button class="modal-close-btn" id="closeHistoryBtn">✕</button>
+                </div>
+                <div class="history-content">
+                    <div class="history-tabs">
+                        <button class="history-tab active" data-tab="recent">Today's Timeline</button>
+                        <button class="history-tab" data-tab="weekly">Past Records</button>
+                        <button class="history-tab" data-tab="events">Log Events</button>
+                    </div>
+                    <div class="history-table-wrapper">
+                        <table class="history-table" id="historyTable">
+                            <thead id="historyThead">
+                                <tr><th>Time</th><th>Action</th><th>Amount / Detail</th></tr>
+                            </thead>
+                            <tbody id="historyBody">
+                                <!-- Generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- ======== INSTALL BANNER ======== -->
+        <div id="installBanner" class="install-banner glass-card hidden">
+            <button class="close-banner" id="closeInstallBanner">✕</button>
+            <div class="ib-content">
+                <div class="ib-icon">📱</div>
+                <div class="ib-text">
+                    <strong>Install Aqua Flow</strong>
+                    <p>Get smarter reminders and access even when offline!</p>
+                </div>
+                <button class="neon-btn primary install-btn" id="installActionBtn"><span>Install</span><div class="btn-glow"></div></button>
+            </div>
+        </div>
+
+        <!-- ======== IN-APP TOAST NOTIFICATION ======== -->
+        <div id="toast-popup" class="toast-popup hidden" role="alert" aria-live="polite">
+            <div class="toast-inner glass-card">
+                <span class="toast-icon" id="toastIcon">💧</span>
+                <div class="toast-body">
+                    <strong id="toastTitle">Great!</strong>
+                    <span id="toastMsg"></span>
+                </div>
+                <button class="toast-close" id="toastClose" aria-label="Close">✕</button>
+            </div>
+        </div>
+
+    </div><!-- /.app-container -->
+
+    <script src="/script.js"></script>
 </body>
 </html>
