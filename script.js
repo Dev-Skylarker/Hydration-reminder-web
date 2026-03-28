@@ -251,6 +251,18 @@ class AquaFlow {
         this.updateAchievements();
         this.updateNotifStatus();
         this.updateRecentSips();
+        this.updateSettingsPage();
+    }
+
+    updateSettingsPage() {
+        let gd = document.getElementById('goalDisplayVal'); if (gd) gd.textContent = this.userData.goal || this.getAdjustedGoal();
+        document.querySelectorAll('.interval-chip').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.mins) === (this.userData.intervalMins || 90));
+        });
+        let sm = document.getElementById('sleepModeToggle'); if (sm) sm.checked = !!this.userData.sleepMode;
+        let ss = document.getElementById('sleepStart'); if (ss) ss.value = this.userData.sleepStart || '22:00';
+        let se = document.getElementById('sleepEnd'); if (se) se.value = this.userData.sleepEnd || '07:00';
+        let hw = document.getElementById('heatwaveToggle'); if(hw) hw.checked = !!this.userData.heatwave;
     }
 
     updateRecentSips() {
@@ -369,10 +381,16 @@ class AquaFlow {
     }
 
     updateNotifStatus() {
-        let el = document.getElementById('notifStatus'); if(!el) return;
-        let perm = Notification.permission;
+        const el = document.getElementById('notifStatus'), ncb = document.getElementById('notif-cta-banner');
+        if(!el) return;
+        const perm = Notification.permission;
         el.textContent = perm === 'granted' ? 'Active' : (perm === 'denied' ? 'Blocked' : 'Tap to Enable');
         el.className = `notif-status notif-${perm === 'granted'?'ok':(perm==='denied'?'denied':'default')}`;
+        
+        if (ncb) {
+            if (perm !== 'granted') ncb.classList.remove('hidden');
+            else ncb.classList.add('hidden');
+        }
     }
 
     scheduleNextReminder() {
@@ -407,27 +425,39 @@ class AquaFlow {
         document.querySelectorAll('[data-page]').forEach(el => el.onclick = () => this.goto(el.dataset.page));
         let goBtn = document.getElementById('startJourney'); if(goBtn) goBtn.onclick = () => this.startJourney();
         let drkBtn = document.getElementById('drinkBtn'); if(drkBtn) drkBtn.onclick = () => this.drinkWater();
+        // Settings Controls
+        let gUp = document.getElementById('goalUp'); if (gUp) gUp.onclick = () => { this.userData.goal = parseInt(this.userData.goal || this.getAdjustedGoal()) + 1; this.save(); this.updateAll(); };
+        let gDn = document.getElementById('goalDown'); if (gDn) gDn.onclick = () => { let cg = parseInt(this.userData.goal || this.getAdjustedGoal()); if(cg > 1) { this.userData.goal = cg - 1; this.save(); this.updateAll(); } };
         
+        document.querySelectorAll('.interval-chip').forEach(btn => {
+            btn.onclick = () => { this.userData.intervalMins = parseInt(btn.dataset.mins); this.save(); this.updateAll(); };
+        });
+
+        let smTgl = document.getElementById('sleepModeToggle'); if (smTgl) smTgl.onchange = (e) => { this.userData.sleepMode = e.target.checked; this.save(); this.updateAll(); };
+        let sSrt = document.getElementById('sleepStart'); if (sSrt) sSrt.onchange = (e) => { this.userData.sleepStart = e.target.value; this.save(); };
+        let sEnd = document.getElementById('sleepEnd'); if (sEnd) sEnd.onchange = (e) => { this.userData.sleepEnd = e.target.value; this.save(); };
+
+        let hwTgl = document.getElementById('heatwaveToggle'); if(hwTgl) { hwTgl.onchange = e => { this.userData.heatwave = e.target.checked; this.save(); this.updateAll(); }; }
+
         let wgtIn = document.getElementById('userWeight'); if(wgtIn) { wgtIn.value = this.userData.userWeight || ''; wgtIn.oninput = e => { this.userData.userWeight = e.target.value; this.save(); }; }
         let actSlc = document.getElementById('userActivity'); if(actSlc) { actSlc.value = this.userData.userActivity || 'moderate'; actSlc.onchange = e => { this.userData.userActivity = e.target.value; this.save(); }; }
         let calcBtn = document.getElementById('calcGoalBtn'); if(calcBtn) calcBtn.onclick = () => this.calculateSmartGoal();
-
-        let hwTgl = document.getElementById('heatwaveToggle'); if(hwTgl) { hwTgl.checked = !!this.userData.heatwave; hwTgl.onchange = e => { this.userData.heatwave = e.target.checked; this.save(); this.updateAll(); }; }
 
         document.querySelectorAll('.size-btn').forEach(btn => btn.onclick = () => {
             document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
             this.userData.selectedMl = parseInt(btn.dataset.ml); this.save();
         });
 
-        let ntBtn = document.getElementById('notificationsToggle'); if(ntBtn) ntBtn.onclick = () => this.requestNotifPerm();
-        let testBtn = document.getElementById('testNotificationBtn'); if(testBtn) testBtn.onclick = () => this.sendSysNotif('💧 Test Drink Reminder!', 'Aqua Flow is working! Stay hydrated. 🌊');
+        let tgl = document.getElementById('notificationsToggle'); if(tgl) tgl.onclick = () => this.requestNotifPerm();
+        let ctaBtn = document.getElementById('notif-cta-btn'); if(ctaBtn) ctaBtn.onclick = () => this.requestNotifPerm();
         let soundTgl = document.getElementById('soundToggle'); if(soundTgl) { soundTgl.checked = this.userData.soundEnabled; soundTgl.onchange = e => { this.userData.soundEnabled = e.target.checked; this.save(); }; }
         let toneSlc = document.getElementById('toneSelect'); if(toneSlc) { toneSlc.value = this.userData.selectedTone || 'aqua'; toneSlc.onchange = e => { this.userData.selectedTone = e.target.value; this.save(); this.playTone('drink'); }; }
         let testSnd = document.getElementById('testSoundBtn'); if(testSnd) testSnd.onclick = () => this.playTone('reminder');
 
-        // Modal buttons
+        // Modal / Popup buttons
         let nEnb = document.getElementById('notif-enable-btn'); if(nEnb) nEnb.onclick = () => { this.requestNotifPerm(); this.closeNotifModal(); };
         let nLat = document.getElementById('notif-later-btn'); if(nLat) nLat.onclick = () => this.closeNotifModal();
+        let lvlCls = document.getElementById('levelUpClose'); if(lvlCls) lvlCls.onclick = () => { let o = document.getElementById('level-up-overlay'); if(o) { o.classList.remove('visible'); setTimeout(() => o.classList.add('hidden'), 300); } };
         
         // History & Settings
         let vhBtn = document.getElementById('viewHistoryBtn'); if(vhBtn) vhBtn.onclick = () => this.showHistory();
@@ -448,7 +478,8 @@ class AquaFlow {
 
         let instBtn = document.getElementById('installActionBtn'); if(instBtn) instBtn.onclick = () => this.installPWA();
         let closeInst = document.getElementById('closeInstallBanner'); if(closeInst) closeInst.onclick = () => {
-            document.getElementById('installBanner').classList.add('hidden');
+            let b = document.getElementById('installBanner');
+            if (b) { b.classList.remove('visible'); setTimeout(()=>b.classList.add('hidden'), 500); }
             localStorage.setItem('pwaPrompted', 'true');
         };
     }
@@ -565,6 +596,14 @@ class AquaFlow {
         let name = document.getElementById('userName').value.trim();
         if(!name) return; this.userData.name = name; this.save();
         this.showWelcomeBack(); this.goto('tracker');
+        setTimeout(() => {
+            const isIos = () => /iphone|ipad|ipod/.test( navigator.userAgent.toLowerCase() );
+            const isInStandaloneMode = () => ('standalone' in window.navigator) && window.navigator.standalone;
+            if (!localStorage.getItem('pwaPrompted')) {
+                if (this.deferredInstall) this.showInstallBanner(false);
+                else if (isIos() && !isInStandaloneMode()) this.showInstallBanner(true);
+            }
+        }, 3000);
     }
 
     showWelcomeBack() {
@@ -578,16 +617,34 @@ class AquaFlow {
         window.addEventListener('beforeinstallprompt', e => { 
             e.preventDefault(); 
             this.deferredInstall = e; 
-            // Show install banner if they haven't seen it recently
             if (!localStorage.getItem('pwaPrompted') && this.userData.name) {
-                this.showInstallBanner();
+                this.showInstallBanner(false);
             }
-        }); 
+        });
+        
+        // iOS detection
+        const isIos = () => {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            return /iphone|ipad|ipod/.test( userAgent );
+        };
+        const isInStandaloneMode = () => ('standalone' in window.navigator) && window.navigator.standalone;
+
+        if (isIos() && !isInStandaloneMode() && !localStorage.getItem('pwaPrompted') && this.userData.name) {
+            this.showInstallBanner(true); // iOS
+        }
     }
 
-    showInstallBanner() {
+    showInstallBanner(isIos = false) {
         let b = document.getElementById('installBanner');
-        if (b) { b.classList.remove('hidden'); setTimeout(()=>b.classList.add('visible'), 50); }
+        if (b) { 
+            if (isIos) {
+                let text = b.querySelector('.ib-text p');
+                if (text) text.textContent = "Tap Share icon ⍗ then 'Add to Home Screen'";
+                let btn = document.getElementById('installActionBtn');
+                if (btn) btn.style.display = 'none'; // iOS has no programmatic install
+            }
+            b.classList.remove('hidden'); setTimeout(()=>b.classList.add('visible'), 50); 
+        }
     }
 
     async installPWA() {
@@ -598,7 +655,7 @@ class AquaFlow {
             this.awardXP(100, 'Installed Aqua Flow 📱');
             localStorage.setItem('pwaPrompted', 'true');
             let b = document.getElementById('installBanner');
-            if (b) b.classList.add('hidden');
+            if (b) { b.classList.remove('visible'); setTimeout(()=>b.classList.add('hidden'), 500); }
         }
         this.deferredInstall = null;
     }
