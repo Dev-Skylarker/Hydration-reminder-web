@@ -3,7 +3,6 @@ class HydrationTracker {
         this.currentPage = 'home';
         this.userData = this.loadUserData();
         this.notificationPermission = 'default';
-        this.deferredPrompt = null;
         this.reminderInterval = null;
         
         // Fun facts about hydration
@@ -44,7 +43,6 @@ class HydrationTracker {
     }
 
     init() {
-        this.registerServiceWorker();
         this.setupEventListeners();
         this.requestNotificationPermission();
         this.updateDisplay();
@@ -56,20 +54,7 @@ class HydrationTracker {
             this.showWelcomeBackSection();
         }
 
-        // PWA Install Logic
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Prevent Chrome 67 and earlier from automatically showing the prompt
-            e.preventDefault();
-            // Stash the event so it can be triggered later.
-            this.deferredPrompt = e;
-            // Update UI to notify the user they can add to home screen
-            this.showInstallBanner();
-        });
 
-        window.addEventListener('appinstalled', (evt) => {
-            console.log('App was installed');
-            this.hideInstallBanner();
-        });
 
         // Prompt for notifications if not set
         setTimeout(() => {
@@ -77,38 +62,7 @@ class HydrationTracker {
         }, 3000);
     }
 
-    showInstallBanner() {
-        const banner = document.getElementById('pwa-install-banner');
-        if (banner) banner.classList.remove('hidden');
-    }
 
-    hideInstallBanner() {
-        const banner = document.getElementById('pwa-install-banner');
-        if (banner) banner.classList.add('hidden');
-    }
-
-    async installPWA() {
-        if (!this.deferredPrompt) return;
-        // Show the prompt
-        this.deferredPrompt.prompt();
-        // Wait for the user to respond to the prompt
-        const { outcome } = await this.deferredPrompt.userChoice;
-        console.log(`User response to the install prompt: ${outcome}`);
-        // We've used the prompt, and can't use it again, throw it away
-        this.deferredPrompt = null;
-        this.hideInstallBanner();
-    }
-
-    async registerServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            try {
-                const registration = await navigator.serviceWorker.register('/sw.js');
-                console.log('SW registration successful');
-            } catch (error) {
-                console.log('SW registration failed: ', error);
-            }
-        }
-    }
 
     loadUserData() {
         const defaultData = {
@@ -278,17 +232,7 @@ class HydrationTracker {
             });
         }
 
-        // PWA Install Events
-        const installBtn = document.getElementById('pwa-install-btn');
-        const closeInstallBtn = document.getElementById('pwa-close-btn');
 
-        if (installBtn) {
-            installBtn.addEventListener('click', () => this.installPWA());
-        }
-
-        if (closeInstallBtn) {
-            closeInstallBtn.addEventListener('click', () => this.hideInstallBanner());
-        }
     }
 
     navigateToPage(page) {
@@ -923,47 +867,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new HydrationTracker();
 });
 
-// Service Worker registration for better performance
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        const swData = `
-            const CACHE_NAME = 'aquaflow-v1';
-            const urlsToCache = [
-                '/',
-                '/style.css',
-                '/script.js'
-            ];
 
-            self.addEventListener('install', event => {
-                event.waitUntil(
-                    caches.open(CACHE_NAME)
-                        .then(cache => cache.addAll(urlsToCache))
-                );
-            });
-
-            self.addEventListener('fetch', event => {
-                event.respondWith(
-                    caches.match(event.request)
-                        .then(response => {
-                            if (response) {
-                                return response;
-                            }
-                            return fetch(event.request);
-                        }
-                    )
-                );
-            });
-        `;
-        
-        const blob = new Blob([swData], { type: 'application/javascript' });
-        const swUrl = URL.createObjectURL(blob);
-        
-        navigator.serviceWorker.register(swUrl)
-            .then(registration => {
-                console.log('SW registered: ', registration);
-            })
-            .catch(registrationError => {
-                console.log('SW registration failed: ', registrationError);
-            });
-    });
-}
